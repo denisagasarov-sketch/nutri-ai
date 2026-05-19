@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0f0f1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Нутри AI">
+<title>Нутри AI</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+
+:root{
+  --bg:#0f0f1a;
+  --card:#1a1a2e;
+  --border:#2a2a4a;
+  --kcal:#f5576c;
+  --prot:#fda085;
+  --clean:#a8ff78;
+  --balance:#00d2ff;
+  --activity:#f093fb;
+  --grad:linear-gradient(90deg,#f093fb,#f5576c,#fda085);
+  --text:#e0e0ff;
+  --muted:#7070a0;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+}
+
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);overscroll-behavior:none}
+
+/* ── Layout ── */
+.app{width:100%;max-width:420px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
+
+/* ── Header ── */
+.hdr{
+  background:var(--card);border-bottom:1px solid var(--border);
+  padding:14px 18px;position:sticky;top:0;z-index:50
+}
+.hdr-title{
+  font-size:19px;font-weight:800;
+  background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent
+}
+.hdr-date{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* ── Nav ── */
+.nav{
+  background:var(--card);border-top:1px solid var(--border);
+  display:flex;position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+  width:100%;max-width:420px;z-index:50;
+  padding-bottom:env(safe-area-inset-bottom)
+}
+.nav-btn{
+  flex:1;padding:10px 0 8px;background:none;border:none;
+  color:var(--muted);font-size:11px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  transition:color .2s
+}
+.nav-btn.active{color:var(--kcal)}
+.nav-btn svg{width:22px;height:22px;stroke-width:1.8}
+
+/* ── Sections ── */
+.sec{display:none;flex:1;padding:14px 16px 90px;overflow-y:auto}
+.sec.active{display:block}
+
+/* ── Cards ── */
+.card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:16px;padding:14px;margin-bottom:10px
+}
+.card-ttl{
+  font-size:11px;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.6px;margin-bottom:10px;font-weight:600
+}
+
+/* ── Inputs ── */
+input[type=text],input[type=number],input[type=password]{
+  background:var(--bg);border:1.5px solid var(--border);border-radius:10px;
+  color:var(--text);padding:11px 13px;font-size:15px;font-family:var(--font);
+  outline:none;transition:border-color .2s;width:100%
+}
+input:focus{border-color:var(--kcal)}
+input::placeholder{color:var(--muted)}
+
+.row{display:flex;gap:8px;align-items:center}
+.row input{flex:1}
+
+/* ── Buttons ── */
+.btn{
+  background:var(--grad);color:#fff;border:none;border-radius:10px;
+  padding:11px 16px;font-size:15px;font-weight:700;cursor:pointer;
+  white-space:nowrap;transition:opacity .15s,transform .1s;
+  -webkit-appearance:none;user-select:none
+}
+.btn:active{transform:scale(.96);opacity:.85}
+.btn:disabled{opacity:.45;pointer-events:none}
+.btn-ghost{background:var(--border);color:var(--text);font-weight:500}
+.btn-danger{background:none;border:1.5px solid var(--kcal);color:var(--kcal);font-weight:500}
+.btn-full{width:100%}
+
+/* ── Macro summary ── */
+.macro-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:12px}
+.mbox{background:var(--bg);border-radius:10px;padding:9px 6px;text-align:center}
+.mbox .v{font-size:20px;font-weight:800;line-height:1}
+.mbox .l{font-size:10px;color:var(--muted);margin-top:3px}
+.mbox.kc .v{color:var(--kcal)}
+.mbox.pr .v{color:var(--prot)}
+.mbox.ft .v{color:#ffecd2}
+.mbox.cb .v{color:var(--balance)}
+
+/* ── Progress bars ── */
+.bars{display:flex;flex-direction:column;gap:9px}
+.bar-row label{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px}
+.bar-row label span:first-child{color:var(--muted)}
+.track{height:7px;background:var(--bg);border-radius:4px;overflow:hidden}
+.fill{height:100%;border-radius:4px;transition:width .5s ease,background .4s}
+
+/* ── Food list ── */
+.food-list{display:flex;flex-direction:column;gap:7px;min-height:30px}
+.food-item{
+  background:var(--bg);border-radius:11px;padding:10px 12px;
+  display:flex;justify-content:space-between;align-items:center;
+  animation:slideIn .3s ease
+}
+@keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.fi-left{flex:1;min-width:0}
+.fi-name{font-size:14px;font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.fi-macros{font-size:11px;color:var(--muted);margin-top:2px}
+.fi-right{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.fi-kcal{font-size:17px;font-weight:800;color:var(--kcal)}
+.fi-del{
+  background:none;border:none;color:var(--muted);cursor:pointer;
+  font-size:20px;line-height:1;padding:2px 4px;
+  transition:color .15s
+}
+.fi-del:active{color:var(--kcal)}
+
+/* ── Badge ── */
+.badge{font-size:10px;padding:2px 6px;border-radius:5px;font-weight:600;letter-spacing:.2px}
+.badge.clean{background:rgba(168,255,120,.15);color:var(--clean)}
+.badge.snack{background:rgba(253,160,133,.15);color:var(--prot)}
+.badge.junk{background:rgba(245,87,108,.15);color:var(--kcal)}
+
+/* ── Activity ── */
+.act-row{display:flex;align-items:center;gap:10px}
+.act-row input{width:100px}
+.act-lbl{font-size:13px;color:var(--muted)}
+
+/* ── Divider ── */
+.div{height:1px;background:var(--border);margin:12px 0}
+
+/* ── Empty ── */
+.empty{text-align:center;color:var(--muted);padding:24px;font-size:14px}
+
+/* ── Spinner ── */
+.spin{
+  width:18px;height:18px;border:2px solid rgba(255,255,255,.3);
+  border-top-color:#fff;border-radius:50%;animation:rot .6s linear infinite;
+  display:inline-block;vertical-align:middle
+}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+/* ── Status text ── */
+.status-txt{font-size:12px;color:var(--muted);margin-top:5px;min-height:15px}
+
+/* ── History ── */
+.hist-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.hist-tbl th{
+  text-align:left;color:var(--muted);font-weight:500;
+  padding:5px 4px;border-bottom:1px solid var(--border)
+}
+.hist-tbl td{padding:7px 4px;border-bottom:1px solid rgba(42,42,74,.4);vertical-align:top}
+.mbar{height:3px;background:rgba(255,255,255,.08);border-radius:2px;margin-top:4px;overflow:hidden}
+.mbar-fill{height:100%;border-radius:2px}
+
+/* ── Settings ── */
+.set-row{margin-bottom:12px}
+.set-row label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+
+/* ── Toast ── */
+.toast{
+  position:fixed;bottom:85px;left:50%;
+  transform:translateX(-50%) translateY(8px);
+  background:#1e1e3a;border:1px solid var(--border);
+  border-radius:10px;padding:11px 20px;font-size:14px;
+  opacity:0;transition:all .25s;z-index:200;pointer-events:none;
+  white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.5)
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── Profile info ── */
+.profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pbox{background:var(--bg);border-radius:10px;padding:10px}
+.pbox .pk{font-size:10px;color:var(--muted);margin-bottom:3px}
+.pbox .pv{font-size:15px;font-weight:700}
+
+/* ── Section header ── */
+.sec-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.sec-hdr h2{font-size:17px;font-weight:700}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HEADER -->
+  <header class="hdr">
+    <div class="hdr-title">Нутри AI</div>
+    <div class="hdr-date" id="hdrDate"></div>
+  </header>
+
+  <!-- TODAY -->
+  <section class="sec active" id="sec-today">
+
+    <!-- Food input -->
+    <div class="card">
+      <div class="card-ttl">Добавить продукт</div>
+      <div class="row">
+        <input type="text" id="foodInput" placeholder="курица 150г, овсянка 70г…" autocomplete="off" />
+        <button class="btn" id="addBtn" onclick="addFood()">+</button>
+      </div>
+      <div class="status-txt" id="addStatus"></div>
+    </div>
+
+    <!-- КБЖУ итог -->
+    <div class="card">
+      <div class="macro-grid">
+        <div class="mbox kc"><div class="v" id="tKcal">0</div><div class="l">ккал</div></div>
+        <div class="mbox pr"><div class="v" id="tProt">0</div><div class="l">белок</div></div>
+        <div class="mbox ft"><div class="v" id="tFat">0</div><div class="l">жиры</div></div>
+        <div class="mbox cb"><div class="v" id="tCarb">0</div><div class="l">углев</div></div>
+      </div>
+      <div class="bars">
+        <div class="bar-row">
+          <label><span>Калории</span><span id="lKcal">0 / 1800</span></label>
+          <div class="track"><div class="fill" id="bKcal" style="width:0%;background:var(--kcal)"></div></div>
+        </div>
+        <div class="bar-row">
+          <label><span>Белок</span><span id="lProt">0 / 150г</span></label>
+          <div class="track"><div class="fill" id="bProt" style="width:0%;background:var(--prot)"></div></div>
+        </div>
+        <div class="bar-row">
+          <label><span>Жиры</span><span id="lFat">0 / 60г</span></label>
+          <div class="track"><div class="fill" id="bFat" style="width:0%;background:#ffecd2"></div></div>
+        </div>
+        <div class="bar-row">
+          <label><span>Углеводы</span><span id="lCarb">0 / 165г</span></label>
+          <div class="track"><div class="fill" id="bCarb" style="width:0%;background:var(--balance)"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Активность -->
+    <div class="card">
+      <div class="card-ttl">Активность (Garmin)</div>
+      <div class="act-row">
+        <input type="number" id="actKcal" placeholder="0" min="0" style="width:110px" oninput="saveActivity()" />
+        <span class="act-lbl">активных ккал</span>
+      </div>
+    </div>
+
+    <!-- Список еды -->
+    <div class="card">
+      <div class="sec-hdr">
+        <div class="card-ttl" style="margin-bottom:0">Съедено сегодня</div>
+      </div>
+      <div class="food-list" id="foodList"></div>
+      <div class="div"></div>
+      <button class="btn btn-full" onclick="closeDay()">Закрыть день</button>
+    </div>
+
+  </section>
+
+  <!-- HISTORY -->
+  <section class="sec" id="sec-history">
+    <div class="card">
+      <div class="card-ttl">Общий балл по дням</div>
+      <canvas id="scoreChart" height="140"></canvas>
+    </div>
+
+    <div class="card">
+      <div class="card-ttl">Баллы по компонентам</div>
+      <table class="hist-tbl">
+        <thead>
+          <tr>
+            <th>День</th>
+            <th style="color:var(--kcal)">Ккал</th>
+            <th style="color:var(--prot)">Белок</th>
+            <th style="color:var(--clean)">Чист.</th>
+            <th style="color:var(--balance)">БЖУ</th>
+            <th style="color:var(--activity)">Акт.</th>
+            <th>∑</th>
+          </tr>
+        </thead>
+        <tbody id="scoreTbody"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-ttl">КБЖУ по дням</div>
+      <table class="hist-tbl">
+        <thead>
+          <tr>
+            <th>День</th>
+            <th>Ккал</th>
+            <th>Белок</th>
+            <th>Жиры</th>
+            <th>Углев</th>
+            <th>Дефицит</th>
+          </tr>
+        </thead>
+        <tbody id="nutriTbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="sec" id="sec-settings">
+    <div class="card">
+      <div class="card-ttl">OpenAI API ключ</div>
+      <div class="set-row">
+        <label>Вставьте ключ (начинается с sk-)</label>
+        <div class="row">
+          <input type="password" id="apiInput" placeholder="sk-…" autocomplete="off" />
+          <button class="btn" onclick="saveKey()">Сохранить</button>
+        </div>
+      </div>
+      <div id="keyStatus" style="font-size:12px;margin-top:4px"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-ttl">Профиль</div>
+      <div class="profile-grid">
+        <div class="pbox"><div class="pk">Возраст / вес</div><div class="pv">36 лет, 83 кг</div></div>
+        <div class="pbox"><div class="pk">Цель</div><div class="pv" style="color:var(--clean)">Похудение</div></div>
+        <div class="pbox"><div class="pk">Калории</div><div class="pv" style="color:var(--kcal)">1800 ккал</div></div>
+        <div class="pbox"><div class="pk">Белок / Жиры / Углев</div><div class="pv" style="font-size:13px">150 / 60 / 165 г</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-ttl">Управление данными</div>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <button class="btn btn-ghost btn-full" onclick="resetDay()">Сбросить текущий день</button>
+        <button class="btn btn-danger btn-full" onclick="clearHistory()">Очистить всю историю</button>
+      </div>
+    </div>
+  </section>
+
+</div><!-- .app -->
+
+<!-- Bottom nav -->
+<nav class="nav">
+  <button class="nav-btn active" id="nav-today" onclick="goTo('today')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    Сегодня
+  </button>
+  <button class="nav-btn" id="nav-history" onclick="goTo('history')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    История
+  </button>
+  <button class="nav-btn" id="nav-settings" onclick="goTo('settings')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93L17.66 6.34M4.93 4.93L6.34 6.34M12 2v2M12 20v2M4.93 19.07l1.41-1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2"/></svg>
+    Настройки
+  </button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─────────────────────────────────────────
+//  CONSTANTS
+// ─────────────────────────────────────────
+const G = { kcal:1800, prot:150, fat:60, carb:165 };
+
+const SYS_PROMPT = `Ты помощник по подсчёту КБЖУ. Пользователь вводит продукт и вес на русском языке. Верни ТОЛЬКО валидный JSON без markdown: { "name": "название продукта", "kcal": число, "prot": число (граммы белка), "fat": число (граммы жиров), "carb": число (граммы углеводов), "cleanliness": "clean" | "snack" | "junk" } cleanliness: clean = натуральная еда, snack = лёгкие снеки (крекеры/мармелад), junk = арахис/чипсы/сухари/гренки. Если продукт не распознан — верни { "error": "не распознано" }.`;
+
+// ─────────────────────────────────────────
+//  LOCAL LOOKUP TABLE (exact values, API not called for these)
+// ─────────────────────────────────────────
+// per100: values per 100g/ml
+// fixedPortion: used when input contains "пачка"/"порция"/"pack" and no explicit grams
+// defaultG: serving size used when no weight specified in input
+const LOOKUP = [
+  {
+    keys: ['овсянка', 'овсяная каша', 'овсяные хлопья', 'oatmeal'],
+    name: 'Овсянка',
+    per100: { kcal: 373, prot: 12, fat: 7, carb: 64 },
+    cleanliness: 'clean'
+  },
+  {
+    keys: ['молоко meiji', 'meiji цельное', 'meiji', 'молоко мейджи', 'молоко'],
+    name: 'Молоко Meiji',
+    per100: { kcal: 70, prot: 3, fat: 4, carb: 5 },
+    cleanliness: 'clean'
+  },
+  {
+    keys: ['prostar whey', 'prostar', 'простар вей', 'простар', 'протеин prostar', 'протеин простар', 'протеин'],
+    name: 'Протеин Prostar Whey',
+    // per100g derived from 120kcal/30g serving
+    per100: { kcal: 400, prot: 83.3, fat: 3.3, carb: 6.7 },
+    defaultG: 30,
+    cleanliness: 'clean'
+  },
+  {
+    keys: ['казеин', 'casein'],
+    name: 'Казеин',
+    // per100g derived from 110kcal/30g serving
+    per100: { kcal: 366.7, prot: 80, fat: 3.3, carb: 6.7 },
+    defaultG: 30,
+    cleanliness: 'clean'
+  },
+  {
+    keys: ['курица тандыр', 'тандыр грудка', 'тандыр', 'курица тандур'],
+    name: 'Курица тандыр',
+    per100: { kcal: 165, prot: 31, fat: 3.5, carb: 0 },
+    cleanliness: 'clean'
+  },
+  {
+    keys: ['koh-kae', 'koh kae', 'кох-кэ', 'кохкэ', 'арахис koh', 'арахис кох'],
+    name: 'Арахис Koh-Kae',
+    // per100g derived from pack (540kcal total; typical ~135g pack)
+    per100: { kcal: 400, prot: 13.3, fat: 28.9, carb: 2.2 },
+    fixedPortion: { label: 'пачка', kcal: 540, prot: 18, fat: 39, carb: 3 },
+    cleanliness: 'junk'
+  },
+  {
+    keys: ['рис варёный', 'рис вареный', 'варёный рис', 'вареный рис', 'рис'],
+    name: 'Рис варёный',
+    per100: { kcal: 130, prot: 2.7, fat: 0.3, carb: 28 },
+    cleanliness: 'clean'
+  },
+  {
+    keys: ['оливковое масло', 'масло оливковое', 'масло olive', 'olive oil'],
+    name: 'Оливковое масло',
+    per100: { kcal: 900, prot: 0, fat: 100, carb: 0 },
+    cleanliness: 'clean'
+  },
+  {
+    keys: ['van houten', 'ван хаутен', 'какао van', 'какао ван', 'какао'],
+    name: 'Какао Van Houten',
+    per100: { kcal: 471, prot: 18.5, fat: 23.4, carb: 46.7 },
+    cleanliness: 'clean'
+  },
+  {
+    keys: ['кокосовый сахар', 'кокос сахар'],
+    name: 'Кокосовый сахар',
+    per100: { kcal: 380, prot: 0, fat: 0, carb: 95 },
+    cleanliness: 'clean'
+  },
+  {
+    keys: ['сгущёнка', 'сгущенка', 'сгущённое молоко', 'сгущенное молоко'],
+    name: 'Сгущёнка',
+    per100: { kcal: 330, prot: 8, fat: 8, carb: 56 },
+    cleanliness: 'snack'
+  },
+  {
+    keys: ['рисовые крекеры', 'рисовый крекер', 'рис крекер'],
+    name: 'Рисовые крекеры',
+    per100: { kcal: 500, prot: 8, fat: 14, carb: 75 },
+    cleanliness: 'snack'
+  },
+];
+
+// ─────────────────────────────────────────
+//  LOCAL LOOKUP FUNCTION
+// ─────────────────────────────────────────
+function lookupLocal(text) {
+  const norm = text.toLowerCase().trim();
+
+  // Build flat (key, product) pairs, longest key first for greedy match
+  const pairs = [];
+  LOOKUP.forEach(p => p.keys.forEach(k => pairs.push([k, p])));
+  pairs.sort((a, b) => b[0].length - a[0].length);
+
+  const match = pairs.find(([k]) => norm.includes(k));
+  if (!match) return null;
+  const prod = match[1];
+
+  // Detect "пачка" / "порция" / "pack" before looking for grams
+  const isFixed = /пачк|порци|pack\b/i.test(norm);
+  if (isFixed && prod.fixedPortion) {
+    const fp = prod.fixedPortion;
+    return {
+      name: prod.name + ' (' + fp.label + ')',
+      kcal: fp.kcal,
+      prot: fp.prot,
+      fat:  fp.fat,
+      carb: fp.carb,
+      cleanliness: prod.cleanliness,
+      _local: true
+    };
+  }
+
+  // Parse weight: supports "70г", "70 г", "70гр", "70 мл", "150ml"
+  // Note: \b does not work with Cyrillic, so we anchor end with (?=\s|$|[^а-яёa-z])
+  const wm = norm.match(/(\d+(?:[.,]\d+)?)\s*(?:гр?(?:амм?)?|мл|ml|g(?:r(?:am)?)?)(?=\s|$|[^а-яёa-z])/);
+  let g = wm ? parseFloat(wm[1].replace(',', '.')) : (prod.defaultG || null);
+  if (!g) return null; // weight unknown — let GPT handle it
+
+  const r = g / 100;
+  const p100 = prod.per100;
+  return {
+    name: prod.name + ' ' + g + 'г',
+    kcal: Math.round(p100.kcal * r),
+    prot: Math.round(p100.prot * r * 10) / 10,
+    fat:  Math.round(p100.fat  * r * 10) / 10,
+    carb: Math.round(p100.carb * r * 10) / 10,
+    cleanliness: prod.cleanliness,
+    _local: true
+  };
+}
+
+const PRESET = [
+  {label:"День 1",kcal:2211,prot:122,fat:105,carb:95, deficit:-411,scores:[10,15,5,7,0], total:37},
+  {label:"День 2",kcal:2145,prot:167,fat:95, carb:55, deficit:-345,scores:[10,25,5,7,0], total:47},
+  {label:"День 3",kcal:1935,prot:172,fat:53, carb:167,deficit:-135,scores:[20,30,18,12,0],total:72},
+  {label:"День 4",kcal:1730,prot:187,fat:28, carb:167,deficit:470, scores:[28,30,20,15,5],total:100},
+  {label:"День 5",kcal:1805,prot:177,fat:54, carb:135,deficit:300, scores:[25,30,22,13,8],total:98}
+];
+
+// ─────────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────────
+let foods   = lsGet('foods',   []);
+let history = lsGet('history', null) ?? [...PRESET];
+let actKcal = parseInt(localStorage.getItem('actKcal') || '0');
+let chart   = null;
+
+// ─────────────────────────────────────────
+//  BOOT
+// ─────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  // Date header
+  const d = new Date();
+  document.getElementById('hdrDate').textContent =
+    d.toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'});
+
+  // Restore activity
+  const actEl = document.getElementById('actKcal');
+  if (actKcal) actEl.value = actKcal;
+
+  // Keyboard enter
+  document.getElementById('foodInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addFood();
+  });
+
+  renderKey();
+  renderFoods();
+  updateTotals();
+
+  // PWA SW
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+});
+
+// ─────────────────────────────────────────
+//  NAVIGATION
+// ─────────────────────────────────────────
+function goTo(name) {
+  document.querySelectorAll('.sec').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('sec-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+  if (name === 'history') renderHistory();
+}
+
+// ─────────────────────────────────────────
+//  API KEY
+// ─────────────────────────────────────────
+function saveKey() {
+  const v = document.getElementById('apiInput').value.trim();
+  if (!v.startsWith('sk-')) { toast('Ключ должен начинаться с sk-'); return; }
+  localStorage.setItem('okey', v);
+  document.getElementById('apiInput').value = '';
+  renderKey();
+  toast('Ключ сохранён ✓');
+}
+
+function renderKey() {
+  const k = localStorage.getItem('okey');
+  const el = document.getElementById('keyStatus');
+  if (k) {
+    el.textContent = '✓ Ключ установлен: sk-…' + k.slice(-4);
+    el.style.color = 'var(--clean)';
+  } else {
+    el.textContent = 'Ключ не установлен — API недоступен';
+    el.style.color = 'var(--muted)';
+  }
+}
+
+// ─────────────────────────────────────────
+//  ADD FOOD
+// ─────────────────────────────────────────
+async function addFood() {
+  const inp = document.getElementById('foodInput');
+  const txt = inp.value.trim();
+  if (!txt) return;
+
+  const btn = document.getElementById('addBtn');
+  const sta = document.getElementById('addStatus');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>';
+  sta.textContent = 'Ищу…';
+
+  try {
+    // ── 1. Try local lookup (no API call) ──────────────────
+    let data = lookupLocal(txt);
+    let source = '📚';
+
+    // ── 2. Fall back to GPT for unknown products ───────────
+    if (!data) {
+      const key = localStorage.getItem('okey');
+      if (!key) {
+        sta.textContent = '❌ Продукт не найден в базе. Добавьте API ключ для распознавания через GPT';
+        btn.disabled = false;
+        btn.textContent = '+';
+        return;
+      }
+      sta.textContent = 'Не найдено локально — спрашиваю GPT…';
+      data = await callGPT(txt, key);
+      source = '🤖';
+    }
+
+    if (data.error) {
+      sta.textContent = '❌ ' + data.error;
+      toast('Продукт не распознан');
+    } else {
+      // Округление (на случай GPT-ответа без предварительного округления)
+      data.kcal = Math.round(data.kcal);
+      data.prot = Math.round(data.prot * 10) / 10;
+      data.fat  = Math.round(data.fat  * 10) / 10;
+      data.carb = Math.round(data.carb * 10) / 10;
+
+      foods.push(data);
+      lsSave('foods', foods);
+      inp.value = '';
+      sta.textContent = source + ' ' + data.name;
+      setTimeout(() => { sta.textContent = ''; }, 2000);
+      renderFoods();
+      updateTotals();
+
+      // Вибрация при достижении цели по белку
+      const totProt = foods.reduce((s,f) => s + f.prot, 0);
+      if (totProt >= G.prot) {
+        toast('Цель по белку достигнута! 💪');
+        try { navigator.vibrate([200,100,200]); } catch(e) {}
+      }
+    }
+  } catch(e) {
+    sta.textContent = '❌ ' + (e.message || 'Ошибка API');
+    toast('Ошибка запроса');
+  }
+
+  btn.disabled = false;
+  btn.textContent = '+';
+}
+
+async function callGPT(text, apiKey) {
+  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + apiKey
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role:'system', content: SYS_PROMPT },
+        { role:'user',   content: text }
+      ],
+      temperature: 0.1,
+      max_tokens: 200
+    })
+  });
+
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new Error(e.error?.message || 'HTTP ' + r.status);
+  }
+
+  const j = await r.json();
+  const raw = j.choices[0].message.content.trim()
+    .replace(/^```[a-z]*\n?/,'').replace(/```$/,'').trim();
+  return JSON.parse(raw);
+}
+
+// ─────────────────────────────────────────
+//  RENDER FOOD LIST
+// ─────────────────────────────────────────
+function renderFoods() {
+  const el = document.getElementById('foodList');
+  if (!foods.length) {
+    el.innerHTML = '<div class="empty">Добавьте первый продукт</div>';
+    return;
+  }
+  el.innerHTML = foods.map((f,i) => `
+    <div class="food-item">
+      <div class="fi-left">
+        <div class="fi-name">
+          ${esc(f.name)}
+          <span class="badge ${f.cleanliness||'clean'}">${clLbl(f.cleanliness)}</span>
+        </div>
+        <div class="fi-macros">Б${f.prot} · Ж${f.fat} · У${f.carb}</div>
+      </div>
+      <div class="fi-right">
+        <div class="fi-kcal">${f.kcal}</div>
+        <button class="fi-del" onclick="removeFood(${i})" aria-label="Удалить">×</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function clLbl(c) {
+  return c === 'junk' ? 'мусор' : c === 'snack' ? 'снек' : 'чистое';
+}
+
+function removeFood(i) {
+  foods.splice(i,1);
+  lsSave('foods', foods);
+  renderFoods();
+  updateTotals();
+}
+
+// ─────────────────────────────────────────
+//  TOTALS & BARS
+// ─────────────────────────────────────────
+function updateTotals() {
+  const t = foods.reduce((a,f) => ({
+    kcal: a.kcal + f.kcal,
+    prot: a.prot + f.prot,
+    fat:  a.fat  + f.fat,
+    carb: a.carb + f.carb
+  }), {kcal:0,prot:0,fat:0,carb:0});
+
+  const rk = Math.round(t.kcal);
+  const rp = Math.round(t.prot);
+  const rf = Math.round(t.fat);
+  const rc = Math.round(t.carb);
+
+  document.getElementById('tKcal').textContent = rk;
+  document.getElementById('tProt').textContent = rp;
+  document.getElementById('tFat').textContent  = rf;
+  document.getElementById('tCarb').textContent = rc;
+
+  document.getElementById('lKcal').textContent = `${rk} / ${G.kcal}`;
+  document.getElementById('lProt').textContent = `${rp} / ${G.prot}г`;
+  document.getElementById('lFat').textContent  = `${rf} / ${G.fat}г`;
+  document.getElementById('lCarb').textContent = `${rc} / ${G.carb}г`;
+
+  setBar('bKcal', t.kcal, G.kcal, 'var(--kcal)');
+  setBar('bProt', t.prot, G.prot, 'var(--prot)');
+  setBar('bFat',  t.fat,  G.fat,  '#ffecd2');
+  setBar('bCarb', t.carb, G.carb, 'var(--balance)');
+}
+
+function setBar(id, val, goal, base) {
+  const el = document.getElementById(id);
+  const pct = Math.min(val / goal * 100, 110);
+  el.style.width = Math.min(pct, 100) + '%';
+  const r = val / goal;
+  if      (r > 1.1) el.style.background = '#ff2244';
+  else if (r > 0.9) el.style.background = base;
+  else if (r > 0.6) el.style.background = '#fda085';
+  else              el.style.background = 'var(--clean)';
+}
+
+// ─────────────────────────────────────────
+//  ACTIVITY
+// ─────────────────────────────────────────
+function saveActivity() {
+  actKcal = parseInt(document.getElementById('actKcal').value) || 0;
+  localStorage.setItem('actKcal', actKcal);
+}
+
+// ─────────────────────────────────────────
+//  SCORING
+// ─────────────────────────────────────────
+function calcScore(kcal, prot, fat, carb, act, foodList) {
+  const deficit = G.kcal - kcal;
+
+  // Calories (30pt)
+  let sc_k;
+  if      (deficit >= 500)            sc_k = 30;
+  else if (deficit >= 300)            sc_k = 28;
+  else if (deficit >= 100)            sc_k = 25;
+  else if (deficit >= 0)              sc_k = 20;
+  else if (deficit >= -100)           sc_k = 15;
+  else if (deficit >= -300)           sc_k = 5;
+  else                                sc_k = -10;
+
+  // Protein (30pt)
+  let sc_p;
+  if      (prot >= 150) sc_p = 30;
+  else if (prot >= 130) sc_p = 25;
+  else if (prot >= 100) sc_p = 15;
+  else                  sc_p = 5;
+
+  // Cleanliness (25pt) — from actual food list
+  let sc_c = 25;
+  if (foodList && foodList.length) {
+    const n = foodList.length;
+    const junkN = foodList.filter(f => f.cleanliness === 'junk').length;
+    const junkR = junkN / n;
+    if      (junkR > 0.3) sc_c = 7;
+    else if (junkR > 0)   sc_c = 13;
+    else {
+      const cleanN = foodList.filter(f => f.cleanliness === 'clean').length;
+      sc_c = cleanN / n >= 0.7 ? 25 : 18;
+    }
+  }
+
+  // Balance (15pt)
+  const inRange = r => r >= 0.8 && r <= 1.1;
+  const hit = [prot/G.prot, fat/G.fat, carb/G.carb].filter(inRange).length;
+  const sc_b = hit >= 3 ? 15 : hit >= 2 ? 10 : hit >= 1 ? 5 : 0;
+
+  // Activity bonus
+  let sc_a = 0;
+  if (act > 0) {
+    if      (act < 200) sc_a = 3;
+    else if (act < 350) sc_a = 5;
+    else                sc_a = 8;
+  }
+
+  return {
+    sc_k, sc_p, sc_c, sc_b, sc_a,
+    total: sc_k + sc_p + sc_c + sc_b + sc_a,
+    deficit
+  };
+}
+
+// ─────────────────────────────────────────
+//  CLOSE DAY
+// ─────────────────────────────────────────
+function closeDay() {
+  if (!foods.length) { toast('Нет данных за день'); return; }
+
+  const t = foods.reduce((a,f) => ({
+    kcal: a.kcal+f.kcal, prot: a.prot+f.prot,
+    fat:  a.fat +f.fat,  carb: a.carb+f.carb
+  }), {kcal:0,prot:0,fat:0,carb:0});
+
+  const s = calcScore(t.kcal, t.prot, t.fat, t.carb, actKcal, foods);
+
+  history.push({
+    label:   'День ' + (history.length + 1),
+    kcal:    Math.round(t.kcal),
+    prot:    Math.round(t.prot),
+    fat:     Math.round(t.fat),
+    carb:    Math.round(t.carb),
+    deficit: Math.round(s.deficit),
+    scores:  [s.sc_k, s.sc_p, s.sc_c, s.sc_b, s.sc_a],
+    total:   s.total
+  });
+  lsSave('history', history);
+
+  // Reset
+  foods   = [];
+  actKcal = 0;
+  lsSave('foods', foods);
+  localStorage.setItem('actKcal', '0');
+  document.getElementById('actKcal').value = '';
+
+  renderFoods();
+  updateTotals();
+  toast(`День закрыт! Балл: ${s.total} очков`);
+}
+
+// ─────────────────────────────────────────
+//  HISTORY
+// ─────────────────────────────────────────
+function renderHistory() {
+  renderChart();
+  renderScoreTable();
+  renderNutriTable();
+}
+
+function renderChart() {
+  const ctx = document.getElementById('scoreChart').getContext('2d');
+  if (chart) chart.destroy();
+
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: history.map(h => h.label.replace('День ','Д')),
+      datasets: [{
+        data: history.map(h => h.total),
+        borderColor: '#f5576c',
+        backgroundColor: 'rgba(245,87,108,.12)',
+        tension: 0.4,
+        fill: true,
+        pointBackgroundColor: '#f5576c',
+        pointRadius: 4,
+        pointHoverRadius: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend:{display:false}, tooltip:{
+        backgroundColor:'#1a1a2e',
+        borderColor:'#2a2a4a',borderWidth:1,
+        titleColor:'#e0e0ff',bodyColor:'#a0a0cc'
+      }},
+      scales: {
+        x:{
+          ticks:{color:'#7070a0',font:{size:10}},
+          grid:{color:'rgba(42,42,74,.5)'}
+        },
+        y:{
+          ticks:{color:'#7070a0',font:{size:10}},
+          grid:{color:'rgba(42,42,74,.5)'},
+          min:0, max:110,
+          suggestedMax:110
+        }
+      }
+    }
+  });
+}
+
+function renderScoreTable() {
+  const maxVals = [30,30,25,15,8];
+  const colors  = ['var(--kcal)','var(--prot)','var(--clean)','var(--balance)','var(--activity)'];
+
+  document.getElementById('scoreTbody').innerHTML = history.map(h => `
+    <tr>
+      <td style="white-space:nowrap;font-size:11px">${h.label}</td>
+      ${h.scores.map((s,i) => `
+        <td>
+          ${s}
+          <div class="mbar">
+            <div class="mbar-fill" style="width:${Math.max(0,s/maxVals[i]*100).toFixed(0)}%;background:${colors[i]}"></div>
+          </div>
+        </td>
+      `).join('')}
+      <td><strong>${h.total}</strong></td>
+    </tr>
+  `).join('');
+}
+
+function renderNutriTable() {
+  document.getElementById('nutriTbody').innerHTML = history.map(h => `
+    <tr>
+      <td style="white-space:nowrap;font-size:11px">${h.label}</td>
+      <td>${h.kcal}<br><small style="color:var(--muted)">${pct(h.kcal,G.kcal)}</small></td>
+      <td>${h.prot}<br><small style="color:var(--muted)">${pct(h.prot,G.prot)}</small></td>
+      <td>${h.fat}<br><small style="color:var(--muted)">${pct(h.fat,G.fat)}</small></td>
+      <td>${h.carb}<br><small style="color:var(--muted)">${pct(h.carb,G.carb)}</small></td>
+      <td style="color:${h.deficit>=0?'var(--clean)':'var(--kcal)'};font-weight:600">
+        ${h.deficit>=0?'+':'-'}${Math.abs(h.deficit)}
+      </td>
+    </tr>
+  `).join('');
+}
+
+// ─────────────────────────────────────────
+//  SETTINGS
+// ─────────────────────────────────────────
+function resetDay() {
+  if (!confirm('Сбросить все данные за сегодня?')) return;
+  foods   = [];
+  actKcal = 0;
+  lsSave('foods', foods);
+  localStorage.setItem('actKcal', '0');
+  document.getElementById('actKcal').value = '';
+  renderFoods();
+  updateTotals();
+  toast('День сброшен');
+}
+
+function clearHistory() {
+  if (!confirm('Очистить всю историю? Это действие нельзя отменить.')) return;
+  history = [...PRESET];
+  lsSave('history', history);
+  toast('История очищена, показаны начальные данные');
+}
+
+// ─────────────────────────────────────────
+//  UTILS
+// ─────────────────────────────────────────
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function pct(v, goal) {
+  return Math.round(v / goal * 100) + '%';
+}
+
+function lsGet(key, def) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; }
+  catch(e) { return def; }
+}
+
+function lsSave(key, val) {
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {}
+}
+</script>
+</body>
+</html>
