@@ -459,9 +459,9 @@ cleanliness: clean=натуральная еда, snack=лёгкие снеки,
 Если продукт не из списка известных — рассчитай КБЖУ самостоятельно из своих знаний питания и верни JSON в том же формате с cleanliness.
 {"error":"не распознано"} возвращай ТОЛЬКО если ввод — случайные символы или явно не еда.`;
 
-const FOOD_VISION_PROMPT = `Прочитай этикетку. Верни ТОЛЬКО JSON:
-{"name":"название продукта","kcal":число,"prot":число,"fat":число,"carb":число,"serving_g":число}
-Все значения на 100г. Если на этикетке указано на порцию — пересчитай на 100г.`;
+const FOOD_VISION_PROMPT = `Прочитай этикетку на фото. Верни ТОЛЬКО JSON без пояснений:
+{"name":"название продукта на русском","kcal_per_serving":число,"prot_per_serving":число,"fat_per_serving":число,"carb_per_serving":число,"serving_g":число}
+Переписывай цифры точно как на этикетке, без округлений и пересчётов.`;
 
 const GARMIN_PROMPT = `This is a Garmin fitness tracker screenshot. Extract these exact values and return ONLY valid JSON without markdown: {"active_kcal":number,"total_kcal":number,"steps":number,"distance_km":number,"active_minutes":number,"body_battery":number,"sleep_score":number} If a value is not visible return null.`;
 
@@ -707,7 +707,17 @@ async function handleFoodPhoto(e) {
 
   try {
     const { base64, mimeType } = await fileToBase64(file);
-    const data = await callVision(base64, mimeType, FOOD_VISION_PROMPT);
+    const raw = await callVision(base64, mimeType, FOOD_VISION_PROMPT);
+    const factor = 100 / (raw.serving_g || 100);
+    const data = {
+      type:      'label',
+      name:      raw.name,
+      kcal:      Math.round(raw.kcal_per_serving * factor),
+      prot:      Math.round(raw.prot_per_serving * factor * 10) / 10,
+      fat:       Math.round(raw.fat_per_serving  * factor * 10) / 10,
+      carb:      Math.round(raw.carb_per_serving * factor * 10) / 10,
+      serving_g: raw.serving_g || 100,
+    };
     _photoData = data;
     showPhotoCard(data);
     sta.textContent = '';
