@@ -747,15 +747,33 @@ function renderPhotoMacros(d) {
 
 function confirmPhotoCard() {
   if (!_photoData) return;
-  pushFood({
-    name:        (document.getElementById('pcName').value || '').trim() || _photoData.name,
-    weight:      Math.round(parseFloat(document.getElementById('pcWeight').value) || 100),
-    kcal:        Math.round(parseFloat(document.getElementById('pcKcal').value) || 0),
-    prot:        Math.round((parseFloat(document.getElementById('pcProt').value) || 0) * 10) / 10,
-    fat:         Math.round((parseFloat(document.getElementById('pcFat').value)  || 0) * 10) / 10,
-    carb:        Math.round((parseFloat(document.getElementById('pcCarb').value) || 0) * 10) / 10,
-    cleanliness: _photoData.cleanliness || 'clean'
-  });
+  const name   = (document.getElementById('pcName').value || '').trim() || _photoData.name;
+  const weight = Math.round(parseFloat(document.getElementById('pcWeight').value) || 100);
+  const kcal   = Math.round(parseFloat(document.getElementById('pcKcal').value) || 0);
+  const prot   = Math.round((parseFloat(document.getElementById('pcProt').value) || 0) * 10) / 10;
+  const fat    = Math.round((parseFloat(document.getElementById('pcFat').value)  || 0) * 10) / 10;
+  const carb   = Math.round((parseFloat(document.getElementById('pcCarb').value) || 0) * 10) / 10;
+  const clean  = _photoData.cleanliness || 'clean';
+
+  pushFood({ name, weight, kcal, prot, fat, carb, cleanliness: clean });
+
+  const per100 = w => w > 0 ? Math.round(w / weight * 100 * 10) / 10 : 0;
+  const userFoods = lsGet('userFoods', []);
+  const idx = userFoods.findIndex(f => f.name.toLowerCase() === name.toLowerCase());
+  const entry = {
+    name,
+    aliases:     [name.toLowerCase().trim()],
+    kcal:        Math.round(per100(kcal)),
+    prot:        per100(prot),
+    fat:         per100(fat),
+    carb:        per100(carb),
+    cleanliness: clean,
+    savedAt:     new Date().toISOString()
+  };
+  if (idx >= 0) userFoods[idx] = entry; else userFoods.push(entry);
+  lsSave('userFoods', userFoods);
+  toast('✓ Продукт сохранён в базу');
+
   dismissPhotoCard();
 }
 
