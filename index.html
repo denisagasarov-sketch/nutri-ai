@@ -426,126 +426,30 @@ input::placeholder{color:var(--muted)}
 // ═══════════════════════════════════════════
 const G = { kcal:1800, prot:150, fat:60, carb:165 };
 
-const SYS_PROMPT = `Ты помощник по подсчёту КБЖУ. Пользователь вводит продукт и вес на русском языке. Верни ТОЛЬКО валидный JSON без markdown: { "name": "название продукта", "kcal": число, "prot": число (граммы белка), "fat": число (граммы жиров), "carb": число (граммы углеводов), "cleanliness": "clean" | "snack" | "junk" } cleanliness: clean = натуральная еда, snack = лёгкие снеки (крекеры/мармелад), junk = арахис/чипсы/сухари/гренки. Если продукт не распознан — верни { "error": "не распознано" }.`;
+const SYS_PROMPT = `Ты помощник по подсчёту КБЖУ. Отвечай ТОЛЬКО валидным JSON без markdown.
+
+ИЗВЕСТНЫЕ ПРОДУКТЫ — если пользователь имеет в виду один из них, используй его КБЖУ и каноническое имя точно как написано:
+- Овсянка (алиасы: овсяная каша, овёс, oatmeal): 373 ккал/100г, Б12 Ж7 У64
+- Молоко Meiji (алиасы: молоко, молоко мейджи, meiji): 70 ккал/100мл, Б3 Ж4 У5
+- Протеин Prostar Whey (алиасы: протеин, прот, whey, вей, простар, protein): порция 30г → 120 ккал, Б25 Ж1 У2
+- Казеин (алиасы: casein, казеин на ночь): порция 30г → 110 ккал, Б24 Ж1 У2
+- Курица тандыр (алиасы: курица, кура, куриная грудка, грудка, курочка, chicken): 165 ккал/100г, Б31 Ж3.5 У0
+- Арахис Koh-Kae (алиасы: арахис, koh kae, арахис пачка): пачка = 540 ккал, Б18 Ж39 У3 (weight=135)
+- Рис варёный (алиасы: рис, rice, рис отварной): 130 ккал/100г, Б2.7 Ж0.3 У28
+- Оливковое масло (алиасы: масло, olive oil, масло оливковое): 900 ккал/100г, Б0 Ж100 У0
+- Какао Van Houten (алиасы: какао, cocoa, ван хаутен): 471 ккал/100г, Б18.5 Ж23.4 У46.7
+- Кокосовый сахар (алиасы: кокос сахар, coconut sugar): 380 ккал/100г, Б0 Ж0 У95
+- Сгущёнка (алиасы: сгущённое молоко, сгущенка): 330 ккал/100г, Б8 Ж8 У56
+- Рисовые крекеры Thong Ampai (алиасы: рисовые крекеры, крекеры рисовые): 500 ккал/100г, Б8 Ж14 У75
+
+Если вес не указан — используй 100г (для протеина/казеина — 30г).
+Верни JSON: {"name":"каноническое название","kcal":число,"prot":число,"fat":число,"carb":число,"weight":число,"cleanliness":"clean"|"snack"|"junk"}
+cleanliness: clean=натуральная еда, snack=лёгкие снеки, junk=арахис/чипсы/фастфуд.
+Если продукт не распознан: {"error":"не распознано"}.`;
 
 const FOOD_VISION_PROMPT = `Identify the food in this image and estimate the weight. Return ONLY valid JSON without markdown: {"name":"food name in Russian","kcal":number,"prot":number,"fat":number,"carb":number,"cleanliness":"clean"|"snack"|"junk","estimated_weight_g":number}`;
 
 const GARMIN_PROMPT = `This is a Garmin fitness tracker screenshot. Extract these exact values and return ONLY valid JSON without markdown: {"active_kcal":number,"total_kcal":number,"steps":number,"distance_km":number,"active_minutes":number,"body_battery":number,"sleep_score":number} If a value is not visible return null.`;
-
-// ═══════════════════════════════════════════
-//  LOCAL LOOKUP TABLE
-// ═══════════════════════════════════════════
-const LOOKUP = [
-  {
-    keys: ['овсянка', 'овсяная каша', 'овсяные хлопья', 'oatmeal'],
-    name: 'Овсянка',
-    per100: { kcal:373, prot:12, fat:7, carb:64 },
-    cleanliness: 'clean'
-  },
-  {
-    keys: ['молоко meiji', 'meiji цельное', 'meiji', 'молоко мейджи', 'молоко'],
-    name: 'Молоко Meiji',
-    per100: { kcal:70, prot:3, fat:4, carb:5 },
-    cleanliness: 'clean'
-  },
-  {
-    keys: ['prostar whey', 'prostar', 'простар вей', 'простар', 'протеин prostar', 'протеин простар', 'протеин'],
-    name: 'Протеин Prostar Whey',
-    per100: { kcal:400, prot:83.3, fat:3.3, carb:6.7 },
-    defaultG: 30,
-    cleanliness: 'clean'
-  },
-  {
-    keys: ['казеин', 'casein'],
-    name: 'Казеин',
-    per100: { kcal:366.7, prot:80, fat:3.3, carb:6.7 },
-    defaultG: 30,
-    cleanliness: 'clean'
-  },
-  {
-    keys: ['курица тандыр', 'тандыр грудка', 'тандыр', 'курица тандур'],
-    name: 'Курица тандыр',
-    per100: { kcal:165, prot:31, fat:3.5, carb:0 },
-    cleanliness: 'clean'
-  },
-  {
-    keys: ['koh-kae', 'koh kae', 'кох-кэ', 'кохкэ', 'арахис koh', 'арахис кох'],
-    name: 'Арахис Koh-Kae',
-    per100: { kcal:400, prot:13.3, fat:28.9, carb:2.2 },
-    fixedPortion: { label:'пачка', kcal:540, prot:18, fat:39, carb:3 },
-    cleanliness: 'junk'
-  },
-  {
-    keys: ['рис варёный', 'рис вареный', 'варёный рис', 'вареный рис', 'рис'],
-    name: 'Рис варёный',
-    per100: { kcal:130, prot:2.7, fat:0.3, carb:28 },
-    cleanliness: 'clean'
-  },
-  {
-    keys: ['оливковое масло', 'масло оливковое', 'масло olive', 'olive oil'],
-    name: 'Оливковое масло',
-    per100: { kcal:900, prot:0, fat:100, carb:0 },
-    cleanliness: 'clean'
-  },
-  {
-    keys: ['van houten', 'ван хаутен', 'какао van', 'какао ван', 'какао'],
-    name: 'Какао Van Houten',
-    per100: { kcal:471, prot:18.5, fat:23.4, carb:46.7 },
-    cleanliness: 'clean'
-  },
-  {
-    keys: ['кокосовый сахар', 'кокос сахар'],
-    name: 'Кокосовый сахар',
-    per100: { kcal:380, prot:0, fat:0, carb:95 },
-    cleanliness: 'clean'
-  },
-  {
-    keys: ['сгущёнка', 'сгущенка', 'сгущённое молоко', 'сгущенное молоко'],
-    name: 'Сгущёнка',
-    per100: { kcal:330, prot:8, fat:8, carb:56 },
-    cleanliness: 'snack'
-  },
-  {
-    keys: ['рисовые крекеры', 'рисовый крекер', 'рис крекер'],
-    name: 'Рисовые крекеры',
-    per100: { kcal:500, prot:8, fat:14, carb:75 },
-    cleanliness: 'snack'
-  },
-];
-// ✅ Verified КБЖУ: 2026-05-20
-
-function lookupLocal(text) {
-  const norm = text.toLowerCase().trim();
-  const pairs = [];
-  LOOKUP.forEach(p => p.keys.forEach(k => pairs.push([k, p])));
-  pairs.sort((a, b) => b[0].length - a[0].length);
-
-  const match = pairs.find(([k]) => norm.includes(k));
-  if (!match) return null;
-  const prod = match[1];
-
-  const isFixed = /пачк|порци|pack\b/i.test(norm);
-  if (isFixed && prod.fixedPortion) {
-    const fp = prod.fixedPortion;
-    return { name:`${prod.name} (${fp.label})`, kcal:fp.kcal, prot:fp.prot, fat:fp.fat, carb:fp.carb, cleanliness:prod.cleanliness, _local:true };
-  }
-
-  const wm = norm.match(/(\d+(?:[.,]\d+)?)\s*(?:гр?(?:амм?)?|мл|ml|g(?:r(?:am)?)?)(?=\s|$|[^а-яёa-z])/);
-  let g = wm ? parseFloat(wm[1].replace(',', '.')) : (prod.defaultG || null);
-  if (!g) return null;
-
-  const r = g / 100, p = prod.per100;
-  return {
-    name: prod.name,
-    weight: g,
-    kcal: Math.round(p.kcal * r),
-    prot: Math.round(p.prot * r * 10) / 10,
-    fat:  Math.round(p.fat  * r * 10) / 10,
-    carb: Math.round(p.carb * r * 10) / 10,
-    cleanliness: prod.cleanliness,
-    _local: true
-  };
-}
 
 // ═══════════════════════════════════════════
 //  PRESET & STATE
@@ -632,43 +536,31 @@ async function addFood() {
   const txt = inp.value.trim();
   if (!txt) return;
 
+  const key = localStorage.getItem('okey');
+  if (!key) { toast('Добавьте API ключ в Настройках'); return; }
+
   const btn = document.getElementById('addBtn');
   const sta = document.getElementById('addStatus');
   btn.disabled = true;
   btn.innerHTML = '<span class="spin"></span>';
-  sta.textContent = 'Ищу…';
+  sta.textContent = 'Спрашиваю GPT…';
 
   try {
-    let data = lookupLocal(txt);
-    let source = '📚';
-
-    if (!data) {
-      const key = localStorage.getItem('okey');
-      if (!key) {
-        sta.textContent = '❌ Не найдено в базе. Добавьте API ключ для GPT';
-        btn.disabled = false; btn.textContent = '+'; return;
-      }
-      sta.textContent = 'Спрашиваю GPT…';
-      data = await callGPT(txt, key);
-      source = '🤖';
-      // Extract weight from user input if GPT didn't return one
-      if (data && !data.error && !data.weight) {
-        const wm = txt.match(/(\d+(?:[.,]\d+)?)\s*(?:г(?:р(?:амм?)?)?|мл|ml|g(?:r(?:am)?)?)(?=\s|$|[^а-яёa-z])/i);
-        if (wm) data.weight = parseFloat(wm[1].replace(',', '.'));
-      }
-      // Strip weight suffix from GPT name to avoid duplication in display
-      if (data && !data.error && data.weight) {
-        data.name = data.name.replace(/\s+\d+(?:[.,]\d+)?\s*г$/i, '').trim();
-      }
-    }
+    const data = await callGPT(txt, key);
 
     if (data.error) {
       sta.textContent = '❌ ' + data.error;
       toast('Продукт не распознан');
     } else {
+      // Ensure weight is always set
+      if (!data.weight) {
+        const wm = txt.match(/(\d+(?:[.,]\d+)?)\s*(?:г(?:р(?:амм?)?)?|мл|ml|g(?:r(?:am)?)?)(?=\s|$|[^а-яёa-z])/i);
+        data.weight = wm ? parseFloat(wm[1].replace(',', '.')) : 100;
+      }
+      data.name = data.name.replace(/\s+\d+(?:[.,]\d+)?\s*г$/i, '').trim();
       pushFood(data);
       inp.value = '';
-      sta.textContent = source + ' ' + data.name;
+      sta.textContent = '🤖 ' + data.name;
       setTimeout(() => { sta.textContent = ''; }, 2000);
     }
   } catch(e) {
@@ -1278,18 +1170,18 @@ async function dayEditAddFood() {
   const text   = input.value.trim();
   if (!text) return;
 
-  status.textContent = '⏳ Распознаю…';
+  const key = localStorage.getItem('okey');
+  if (!key) { status.textContent = '❌ Добавьте API ключ в Настройках'; return; }
+
+  status.textContent = '⏳ Спрашиваю GPT…';
   try {
-    let data = lookupLocal(text);
-    let source = '📚';
-    if (!data) {
-      const key = localStorage.getItem('okey');
-      if (!key) { status.textContent = '❌ Не найдено. Добавьте API ключ'; return; }
-      status.textContent = 'Спрашиваю GPT…';
-      data = await callGPT(text, key);
-      source = '🤖';
-    }
+    const data = await callGPT(text, key);
     if (data.error) { status.textContent = '❌ ' + data.error; return; }
+    if (!data.weight) {
+      const wm = text.match(/(\d+(?:[.,]\d+)?)\s*(?:г(?:р(?:амм?)?)?|мл|ml|g(?:r(?:am)?)?)(?=\s|$|[^а-яёa-z])/i);
+      data.weight = wm ? parseFloat(wm[1].replace(',', '.')) : 100;
+    }
+    data.name = data.name.replace(/\s+\d+(?:[.,]\d+)?\s*г$/i, '').trim();
     data.kcal = Math.round(data.kcal);
     data.prot = Math.round(data.prot * 10) / 10;
     data.fat  = Math.round(data.fat  * 10) / 10;
@@ -1299,7 +1191,7 @@ async function dayEditAddFood() {
     recalcDayTotals(_dayEditIdx);
     lsSave('history', history);
     input.value = '';
-    status.textContent = source + ' ' + data.name;
+    status.textContent = '🤖 ' + data.name;
     setTimeout(() => { status.textContent = ''; }, 2000);
     renderDayEditFoodList();
   } catch(e) {
