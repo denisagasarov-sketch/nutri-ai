@@ -708,19 +708,27 @@ async function handleFoodPhoto(e) {
   try {
     const { base64, mimeType } = await fileToBase64(file);
     const raw = await callVision(base64, mimeType, FOOD_VISION_PROMPT);
-    const factor = 100 / (raw.serving_g || 100);
-    const data = {
-      type:      'label',
-      name:      raw.name,
-      kcal:      Math.round(raw.kcal_per_serving * factor),
-      prot:      Math.round(raw.prot_per_serving * factor * 10) / 10,
-      fat:       Math.round(raw.fat_per_serving  * factor * 10) / 10,
-      carb:      Math.round(raw.carb_per_serving * factor * 10) / 10,
-      serving_g: raw.serving_g || 100,
-    };
+    let data, warn = '';
+    if (!raw.serving_g || raw.serving_g <= 0) {
+      data = {
+        type: 'label', name: raw.name, serving_g: null,
+        kcal: raw.kcal_per_serving, prot: raw.prot_per_serving,
+        fat:  raw.fat_per_serving,  carb: raw.carb_per_serving,
+      };
+      warn = '⚠️ Размер порции не найден — введи вес порции вручную';
+    } else {
+      const f = 100 / raw.serving_g;
+      data = {
+        type: 'label', name: raw.name, serving_g: raw.serving_g,
+        kcal: Math.round(raw.kcal_per_serving * f),
+        prot: Math.round(raw.prot_per_serving * f * 10) / 10,
+        fat:  Math.round(raw.fat_per_serving  * f * 10) / 10,
+        carb: Math.round(raw.carb_per_serving * f * 10) / 10,
+      };
+    }
     _photoData = data;
     showPhotoCard(data);
-    sta.textContent = '';
+    sta.textContent = warn;
   } catch(err) {
     sta.textContent = '❌ ' + (err.message || 'Ошибка');
     toast('Ошибка распознавания');
@@ -747,9 +755,9 @@ function showPhotoCard(data) {
     badge.className = 'badge clean';
     badge.textContent = 'этикетка';
     lbl.textContent = 'Сколько съел, г?';
-    const g = data.serving_g || 100;
-    document.getElementById('pcWeight').value = g;
-    renderPhotoMacros(scaleFromPer100(data, g));
+    const g = data.serving_g || null;
+    document.getElementById('pcWeight').value = g || '';
+    renderPhotoMacros(g ? scaleFromPer100(data, g) : data);
   } else {
     badge.className = 'badge ' + (data.cleanliness || 'clean');
     badge.textContent = clLbl(data.cleanliness);
