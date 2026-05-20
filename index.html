@@ -67,6 +67,7 @@ input::placeholder{color:var(--muted)}
 .btn:disabled{opacity:.45;pointer-events:none}
 .btn-ghost{background:var(--border);color:var(--text);font-weight:500}
 .btn-danger{background:none;border:1.5px solid var(--kcal);color:var(--kcal);font-weight:500}
+.btn-secondary{background:#2a2a4a;color:#7070a0;font-weight:500;border:1px solid var(--border)}
 .btn-full{width:100%}
 
 /* ── Icon button (camera etc.) ── */
@@ -267,7 +268,7 @@ input::placeholder{color:var(--muted)}
       </div>
       <div class="food-list" id="foodList"></div>
       <div class="div"></div>
-      <button class="btn btn-full" onclick="openCloseDayModal()">Закрыть день</button>
+      <button class="btn btn-full btn-secondary" onclick="openCloseDayModal()">Закрыть день</button>
     </div>
 
   </section>
