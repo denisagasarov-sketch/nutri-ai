@@ -459,15 +459,9 @@ cleanliness: clean=натуральная еда, snack=лёгкие снеки,
 Если продукт не из списка известных — рассчитай КБЖУ самостоятельно из своих знаний питания и верни JSON в том же формате с cleanliness.
 {"error":"не распознано"} возвращай ТОЛЬКО если ввод — случайные символы или явно не еда.`;
 
-const FOOD_VISION_PROMPT = `Analyze this image. Determine if it is a NUTRITION LABEL or a FOOD/DISH.
-
-If NUTRITION LABEL: return ONLY valid JSON without markdown:
-{"type":"label","name":"product name in Russian","kcal":number,"prot":number,"fat":number,"carb":number,"serving_g":number}
-where kcal/prot/fat/carb are values PER 100g from the label, serving_g is the serving size shown (or 100 if not shown).
-
-If FOOD or DISH: return ONLY valid JSON without markdown:
-{"type":"food","name":"food name in Russian","kcal":number,"prot":number,"fat":number,"carb":number,"weight":number,"cleanliness":"clean"|"snack"|"junk"}
-where kcal/prot/fat/carb are for the estimated total portion shown, weight is estimated grams.`;
+const FOOD_VISION_PROMPT = `Прочитай этикетку. Верни ТОЛЬКО JSON:
+{"name":"название продукта","kcal":число,"prot":число,"fat":число,"carb":число,"serving_g":число}
+Все значения на 100г. Если на этикетке указано на порцию — пересчитай на 100г.`;
 
 const GARMIN_PROMPT = `This is a Garmin fitness tracker screenshot. Extract these exact values and return ONLY valid JSON without markdown: {"active_kcal":number,"total_kcal":number,"steps":number,"distance_km":number,"active_minutes":number,"body_battery":number,"sleep_score":number} If a value is not visible return null.`;
 
