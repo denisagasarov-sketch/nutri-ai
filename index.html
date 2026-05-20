@@ -550,16 +550,51 @@ function renderKey() {
 // ═══════════════════════════════════════════
 //  ADD FOOD (text)
 // ═══════════════════════════════════════════
+function lookupUserFoods(txt) {
+  const userFoods = lsGet('userFoods', []);
+  if (!userFoods.length) return null;
+  const q = txt.toLowerCase().trim();
+  const found = userFoods.find(f => {
+    if (q.includes(f.name.toLowerCase().trim())) return true;
+    return (f.aliases || []).some(a => q.includes(a.toLowerCase().trim()));
+  });
+  if (!found) return null;
+  const wm = txt.match(/(\d+(?:[.,]\d+)?)\s*(?:г(?:р(?:амм?)?)?|мл|ml|g(?:r(?:am)?)?)(?=\s|$|[^а-яёa-z])/i);
+  const weight = wm ? parseFloat(wm[1].replace(',', '.')) : 100;
+  const s = weight / 100;
+  return {
+    name:        found.name,
+    weight:      Math.round(weight),
+    kcal:        Math.round(found.kcal * s),
+    prot:        Math.round(found.prot * s * 10) / 10,
+    fat:         Math.round(found.fat  * s * 10) / 10,
+    carb:        Math.round(found.carb * s * 10) / 10,
+    cleanliness: found.cleanliness || 'clean'
+  };
+}
+
 async function addFood() {
   const inp = document.getElementById('foodInput');
   const txt = inp.value.trim();
   if (!txt) return;
 
+  const btn = document.getElementById('addBtn');
+  const sta = document.getElementById('addStatus');
+
+  // 1) userFoods local lookup — no API needed
+  const local = lookupUserFoods(txt);
+  if (local) {
+    pushFood(local);
+    inp.value = '';
+    sta.textContent = '📦 ' + local.name;
+    setTimeout(() => { sta.textContent = ''; }, 2000);
+    return;
+  }
+
+  // 2) GPT (SYS_PROMPT already encodes known products as fallback)
   const key = localStorage.getItem('okey');
   if (!key) { toast('Добавьте API ключ в Настройках'); return; }
 
-  const btn = document.getElementById('addBtn');
-  const sta = document.getElementById('addStatus');
   btn.disabled = true;
   btn.innerHTML = '<span class="spin"></span>';
   sta.textContent = 'Спрашиваю GPT…';
@@ -571,7 +606,6 @@ async function addFood() {
       sta.textContent = '❌ ' + data.error;
       toast('Продукт не распознан');
     } else {
-      // Ensure weight is always set
       if (!data.weight) {
         const wm = txt.match(/(\d+(?:[.,]\d+)?)\s*(?:г(?:р(?:амм?)?)?|мл|ml|g(?:r(?:am)?)?)(?=\s|$|[^а-яёa-z])/i);
         data.weight = wm ? parseFloat(wm[1].replace(',', '.')) : 100;
