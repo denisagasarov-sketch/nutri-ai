@@ -651,6 +651,15 @@ async function addFood() {
       sta.textContent = 'Спрашиваю GPT…';
       data = await callGPT(txt, key);
       source = '🤖';
+      // Extract weight from user input if GPT didn't return one
+      if (data && !data.error && !data.weight) {
+        const wm = txt.match(/(\d+(?:[.,]\d+)?)\s*(?:г(?:р(?:амм?)?)?|мл|ml|g(?:r(?:am)?)?)(?=\s|$|[^а-яёa-z])/i);
+        if (wm) data.weight = parseFloat(wm[1].replace(',', '.'));
+      }
+      // Strip weight suffix from GPT name to avoid duplication in display
+      if (data && !data.error && data.weight) {
+        data.name = data.name.replace(/\s+\d+(?:[.,]\d+)?\s*г$/i, '').trim();
+      }
     }
 
     if (data.error) {
@@ -900,9 +909,9 @@ function renderFoods() {
   const el = document.getElementById('foodList');
   if (!foods.length) { el.innerHTML = '<div class="empty">Добавьте первый продукт</div>'; return; }
   el.innerHTML = foods.map((f,i) => {
-    const wm = !f.weight ? f.name.match(/^(.*?)\s+(\d+(?:\.\d+)?)г$/) : null;
+    const wm = f.name.match(/^(.*?)\s+(\d+(?:\.\d+)?)г$/);
     const displayName = wm ? wm[1] : f.name;
-    const weight = f.weight ?? (wm ? wm[2] : null);
+    const weight = f.weight ?? (wm ? parseFloat(wm[2]) : null);
     const wSpan = weight ? `<span style="color:var(--muted);font-weight:400;font-size:12px">${weight}г</span>` : '';
     return `
     <div class="food-item" onclick="openWeightEdit(${i})" style="cursor:pointer">
@@ -927,7 +936,7 @@ function removeFood(i) {
 function openWeightEdit(i) {
   _weightEditIdx = i;
   const f = foods[i];
-  const wm = !f.weight ? f.name.match(/^(.*?)\s+(\d+(?:\.\d+)?)г$/) : null;
+  const wm = f.name.match(/^(.*?)\s+(\d+(?:\.\d+)?)г$/);
   const displayName = wm ? wm[1] : f.name;
   const weight = f.weight ?? (wm ? parseFloat(wm[2]) : null);
   document.getElementById('weightModalTitle').textContent = displayName;
@@ -952,7 +961,7 @@ function saveWeightEdit() {
     : foods[_weightEditIdx];
   if (!f) { closeWeightModal(); return; }
 
-  const wm = !f.weight ? f.name.match(/^(.*?)\s+(\d+(?:\.\d+)?)г$/) : null;
+  const wm = f.name.match(/^(.*?)\s+(\d+(?:\.\d+)?)г$/);
   const curW = f.weight ?? (wm ? parseFloat(wm[2]) : null);
   if (!curW) { closeWeightModal(); return; }
 
@@ -1224,9 +1233,9 @@ function renderDayEditFoodList() {
   const el = document.getElementById('dayEditFoodList');
   if (!fl.length) { el.innerHTML = '<div class="empty">Нет продуктов</div>'; return; }
   el.innerHTML = fl.map((f, i) => {
-    const wm = !f.weight ? f.name.match(/^(.*?)\s+(\d+(?:\.\d+)?)г$/) : null;
+    const wm = f.name.match(/^(.*?)\s+(\d+(?:\.\d+)?)г$/);
     const displayName = wm ? wm[1] : f.name;
-    const weight = f.weight ?? (wm ? wm[2] : null);
+    const weight = f.weight ?? (wm ? parseFloat(wm[2]) : null);
     const wSpan = weight ? `<span style="color:var(--muted);font-size:12px"> ${weight}г</span>` : '';
     return `
       <div class="food-item" onclick="dayEditOpenWeight(${i})" style="cursor:pointer">
@@ -1254,7 +1263,7 @@ function dayEditOpenWeight(foodIdx) {
   _dayEditFoodIdx = foodIdx;
   _weightEditMode = 'history';
   const f = history[_dayEditIdx].foods[foodIdx];
-  const wm = !f.weight ? f.name.match(/^(.*?)\s+(\d+(?:\.\d+)?)г$/) : null;
+  const wm = f.name.match(/^(.*?)\s+(\d+(?:\.\d+)?)г$/);
   const displayName = wm ? wm[1] : f.name;
   const curW = f.weight ?? (wm ? parseFloat(wm[2]) : null);
   document.getElementById('weightModalTitle').textContent = displayName;
