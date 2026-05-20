@@ -435,6 +435,7 @@ input::placeholder{color:var(--muted)}
 // ═══════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════
+const VERSION = '1.0.8';
 const G = { kcal:1800, prot:150, fat:60, carb:165 };
 
 const SYS_PROMPT = `Ты помощник по подсчёту КБЖУ. Отвечай ТОЛЬКО валидным JSON без markdown.
@@ -503,7 +504,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const d = new Date();
   document.getElementById('hdrDate').textContent =
-    d.toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'});
+    d.toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'}) + ' · v' + VERSION;
   if (actKcal) document.getElementById('actKcal').value = actKcal;
   document.getElementById('foodInput').addEventListener('keydown', e => { if (e.key==='Enter') addFood(); });
   renderKey();
