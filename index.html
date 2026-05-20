@@ -334,6 +334,7 @@ input::placeholder{color:var(--muted)}
       <div class="card-ttl">Управление данными</div>
       <div style="display:flex;flex-direction:column;gap:9px">
         <button class="btn btn-ghost btn-full" onclick="resetDay()">Сбросить текущий день</button>
+        <button class="btn btn-danger btn-full" onclick="deleteLastDay()">Удалить последний день</button>
         <button class="btn btn-danger btn-full" onclick="clearHistory()">Очистить всю историю</button>
       </div>
     </div>
@@ -1213,6 +1214,14 @@ function resetDay() {
   dismissPhotoCard();
   renderFoods(); updateTotals();
   toast('День сброшен');
+}
+
+function deleteLastDay() {
+  if (!history.length) { toast('История пуста'); return; }
+  if (!confirm('Удалить последний день из истории? Это действие нельзя отменить.')) return;
+  history.pop();
+  lsSave('history', history);
+  location.reload();
 }
 
 function clearHistory() {
