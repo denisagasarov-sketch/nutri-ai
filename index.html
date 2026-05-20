@@ -456,11 +456,11 @@ const GARMIN_PROMPT = `This is a Garmin fitness tracker screenshot. Extract thes
 //  PRESET & STATE
 // ═══════════════════════════════════════════
 const PRESET = [
-  {label:"День 1",kcal:2211,prot:122,fat:105,carb:95, deficit:-411,scores:[10,15,5,7,0], total:37},
-  {label:"День 2",kcal:2145,prot:167,fat:95, carb:55, deficit:-345,scores:[10,25,5,7,0], total:47},
-  {label:"День 3",kcal:1935,prot:172,fat:53, carb:167,deficit:-135,scores:[20,30,18,12,0],total:72},
-  {label:"День 4",kcal:1730,prot:187,fat:28, carb:167,deficit:470, scores:[28,30,20,15,5],total:100},
-  {label:"День 5",kcal:1805,prot:177,fat:54, carb:135,deficit:300, scores:[25,30,22,13,8],total:98}
+  {date:'2026-05-15T12:00:00.000Z',kcal:2211,prot:122,fat:105,carb:95, deficit:-411,actKcal:0,  garminDist:0,   foods:[],scores:[10,15,5,7,0], total:37},
+  {date:'2026-05-16T12:00:00.000Z',kcal:2145,prot:167,fat:95, carb:55, deficit:-345,actKcal:0,  garminDist:0,   foods:[],scores:[10,25,5,7,0], total:47},
+  {date:'2026-05-17T12:00:00.000Z',kcal:1935,prot:172,fat:53, carb:167,deficit:-135,actKcal:0,  garminDist:0,   foods:[],scores:[20,30,18,12,0],total:80},
+  {date:'2026-05-18T12:00:00.000Z',kcal:1730,prot:187,fat:28, carb:167,deficit:70,  actKcal:339,garminDist:4.97,foods:[],scores:[28,30,20,15,5],total:98},
+  {date:'2026-05-19T12:00:00.000Z',kcal:2070,prot:181,fat:61, carb:175,deficit:-270,actKcal:369,garminDist:5.48,foods:[],scores:[25,30,22,13,8],total:98}
 ];
 
 let foods      = lsGet('foods',   []);
