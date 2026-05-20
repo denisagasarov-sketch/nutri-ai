@@ -212,7 +212,7 @@ input::placeholder{color:var(--muted)}
         <span class="badge clean" id="pcBadge"></span>
       </div>
       <div class="photo-weight-row">
-        <label>Вес:</label>
+        <label id="pcWeightLabel">Вес:</label>
         <input type="number" id="pcWeight" min="1" max="2000" oninput="recalcPhoto()">
         <span style="font-size:13px;color:var(--muted)">г</span>
       </div>
@@ -448,7 +448,15 @@ const SYS_PROMPT = `Ты помощник по подсчёту КБЖУ. Отв
 cleanliness: clean=натуральная еда, snack=лёгкие снеки, junk=арахис/чипсы/фастфуд.
 Если продукт не распознан: {"error":"не распознано"}.`;
 
-const FOOD_VISION_PROMPT = `Identify the food in this image and estimate the weight. Return ONLY valid JSON without markdown: {"name":"food name in Russian","kcal":number,"prot":number,"fat":number,"carb":number,"cleanliness":"clean"|"snack"|"junk","estimated_weight_g":number}`;
+const FOOD_VISION_PROMPT = `Analyze this image. Determine if it is a NUTRITION LABEL or a FOOD/DISH.
+
+If NUTRITION LABEL: return ONLY valid JSON without markdown:
+{"type":"label","name":"product name in Russian","kcal":number,"prot":number,"fat":number,"carb":number,"serving_g":number}
+where kcal/prot/fat/carb are values PER 100g from the label, serving_g is the serving size shown (or 100 if not shown).
+
+If FOOD or DISH: return ONLY valid JSON without markdown:
+{"type":"food","name":"food name in Russian","kcal":number,"prot":number,"fat":number,"carb":number,"weight":number,"cleanliness":"clean"|"snack"|"junk"}
+where kcal/prot/fat/carb are for the estimated total portion shown, weight is estimated grams.`;
 
 const GARMIN_PROMPT = `This is a Garmin fitness tracker screenshot. Extract these exact values and return ONLY valid JSON without markdown: {"active_kcal":number,"total_kcal":number,"steps":number,"distance_km":number,"active_minutes":number,"body_battery":number,"sleep_score":number} If a value is not visible return null.`;
 
@@ -672,28 +680,53 @@ async function handleFoodPhoto(e) {
   btn.disabled = false; btn.textContent = '📷';
 }
 
+function scaleFromPer100(data, grams) {
+  const s = grams / 100;
+  return {
+    kcal: Math.round(data.kcal * s),
+    prot: Math.round(data.prot * s * 10) / 10,
+    fat:  Math.round(data.fat  * s * 10) / 10,
+    carb: Math.round(data.carb * s * 10) / 10,
+  };
+}
+
 function showPhotoCard(data) {
   document.getElementById('pcName').textContent = data.name;
   const badge = document.getElementById('pcBadge');
-  badge.className = 'badge ' + (data.cleanliness || 'clean');
-  badge.textContent = clLbl(data.cleanliness);
-  document.getElementById('pcWeight').value = data.estimated_weight_g || 100;
-  renderPhotoMacros(data);
+  const lbl = document.getElementById('pcWeightLabel');
+  if (data.type === 'label') {
+    badge.className = 'badge clean';
+    badge.textContent = 'этикетка';
+    lbl.textContent = 'Сколько съел, г?';
+    const g = data.serving_g || 100;
+    document.getElementById('pcWeight').value = g;
+    renderPhotoMacros(scaleFromPer100(data, g));
+  } else {
+    badge.className = 'badge ' + (data.cleanliness || 'clean');
+    badge.textContent = clLbl(data.cleanliness);
+    lbl.textContent = 'Вес:';
+    document.getElementById('pcWeight').value = data.weight || 100;
+    renderPhotoMacros(data);
+  }
   document.getElementById('photoCard').style.display = 'block';
   document.getElementById('photoCard').scrollIntoView({behavior:'smooth', block:'nearest'});
 }
 
 function recalcPhoto() {
   if (!_photoData) return;
-  const wNew  = parseFloat(document.getElementById('pcWeight').value) || 0;
-  const wOrig = _photoData.estimated_weight_g || 100;
-  const s = wNew / wOrig;
-  renderPhotoMacros({
-    kcal: Math.round(_photoData.kcal * s),
-    prot: Math.round(_photoData.prot * s * 10) / 10,
-    fat:  Math.round(_photoData.fat  * s * 10) / 10,
-    carb: Math.round(_photoData.carb * s * 10) / 10,
-  });
+  const wNew = parseFloat(document.getElementById('pcWeight').value) || 0;
+  if (_photoData.type === 'label') {
+    renderPhotoMacros(scaleFromPer100(_photoData, wNew));
+  } else {
+    const wOrig = _photoData.weight || 100;
+    const s = wNew / wOrig;
+    renderPhotoMacros({
+      kcal: Math.round(_photoData.kcal * s),
+      prot: Math.round(_photoData.prot * s * 10) / 10,
+      fat:  Math.round(_photoData.fat  * s * 10) / 10,
+      carb: Math.round(_photoData.carb * s * 10) / 10,
+    });
+  }
 }
 
 function renderPhotoMacros(d) {
@@ -707,16 +740,27 @@ function renderPhotoMacros(d) {
 
 function confirmPhotoCard() {
   if (!_photoData) return;
-  const wNew  = parseFloat(document.getElementById('pcWeight').value) || (_photoData.estimated_weight_g || 100);
-  const wOrig = _photoData.estimated_weight_g || 100;
-  const s = wNew / wOrig;
+  const wNew = parseFloat(document.getElementById('pcWeight').value) || 100;
+  let macros;
+  if (_photoData.type === 'label') {
+    macros = scaleFromPer100(_photoData, wNew);
+  } else {
+    const wOrig = _photoData.weight || 100;
+    const s = wNew / wOrig;
+    macros = {
+      kcal: Math.round(_photoData.kcal * s),
+      prot: Math.round(_photoData.prot * s * 10) / 10,
+      fat:  Math.round(_photoData.fat  * s * 10) / 10,
+      carb: Math.round(_photoData.carb * s * 10) / 10,
+    };
+  }
   pushFood({
     name:        _photoData.name,
     weight:      Math.round(wNew),
-    kcal:        Math.round(_photoData.kcal * s),
-    prot:        Math.round(_photoData.prot * s * 10) / 10,
-    fat:         Math.round(_photoData.fat  * s * 10) / 10,
-    carb:        Math.round(_photoData.carb * s * 10) / 10,
+    kcal:        macros.kcal,
+    prot:        macros.prot,
+    fat:         macros.fat,
+    carb:        macros.carb,
     cleanliness: _photoData.cleanliness || 'clean'
   });
   dismissPhotoCard();
