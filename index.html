@@ -268,7 +268,7 @@ input::placeholder{color:var(--muted)}
       </div>
       <div class="food-list" id="foodList"></div>
       <div class="div"></div>
-      <button class="btn btn-full btn-secondary" onclick="openCloseDayModal()">Закрыть день</button>
+      <button onclick="openCloseDayModal()" style="width:100%;padding:12px;background:#1e1e3a;border:1px solid var(--border);color:var(--muted);border-radius:10px;font-size:15px;font-weight:500;cursor:pointer;">Закрыть день</button>
     </div>
 
   </section>
@@ -456,7 +456,8 @@ const SYS_PROMPT = `Ты помощник по подсчёту КБЖУ. Отв
 Если вес не указан — используй 100г (для протеина/казеина — 30г).
 Верни JSON: {"name":"каноническое название","kcal":число,"prot":число,"fat":число,"carb":число,"weight":число,"cleanliness":"clean"|"snack"|"junk"}
 cleanliness: clean=натуральная еда, snack=лёгкие снеки, junk=арахис/чипсы/фастфуд.
-Если продукт не распознан: {"error":"не распознано"}.`;
+Если продукт не из списка известных — рассчитай КБЖУ самостоятельно из своих знаний питания и верни JSON в том же формате с cleanliness.
+{"error":"не распознано"} возвращай ТОЛЬКО если ввод — случайные символы или явно не еда.`;
 
 const FOOD_VISION_PROMPT = `Analyze this image. Determine if it is a NUTRITION LABEL or a FOOD/DISH.
 
