@@ -34,8 +34,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 
 /* ── Header ── */
 .hdr{background:var(--card);border-bottom:1px solid var(--border);padding:14px 18px;position:sticky;top:0;z-index:50}
-.hdr-title{font-size:19px;font-weight:800;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.hdr-date{font-size:11px;color:var(--muted);margin-top:2px}
+.hdr-date{font-size:11px;color:var(--muted)}
 
 /* ── Nav ── */
 .nav{background:var(--card);border-top:1px solid var(--border);display:flex;position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:420px;z-index:50;padding-bottom:env(safe-area-inset-bottom)}
@@ -153,10 +152,6 @@ input::placeholder{color:var(--muted)}
 .mbar{height:3px;background:rgba(255,255,255,.08);border-radius:2px;margin-top:4px;overflow:hidden}
 .mbar-fill{height:100%;border-radius:2px}
 
-/* ── Edit button (in history table) ── */
-.btn-edit{background:none;border:none;cursor:pointer;font-size:13px;padding:0 2px;opacity:.5;transition:opacity .15s;vertical-align:middle}
-.btn-edit:active{opacity:1}
-
 /* ── Modal ── */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:flex-end;justify-content:center;z-index:300;padding-bottom:env(safe-area-inset-bottom)}
 .modal-box{background:var(--card);border:1px solid var(--border);border-radius:20px 20px 0 0;padding:20px 18px 24px;width:100%;max-width:420px;max-height:92vh;overflow-y:auto}
@@ -192,7 +187,6 @@ input::placeholder{color:var(--muted)}
 
   <!-- HEADER -->
   <header class="hdr">
-    <div class="hdr-title">Нутри AI</div>
     <div class="hdr-date" id="hdrDate"></div>
   </header>
 
@@ -257,18 +251,6 @@ input::placeholder{color:var(--muted)}
       </div>
     </div>
 
-    <!-- Активность -->
-    <div class="card">
-      <div class="card-ttl">Активность (Garmin)</div>
-      <div class="act-row">
-        <input type="number" id="actKcal" placeholder="0" min="0" oninput="saveActivity()" />
-        <span class="act-lbl">активных ккал</span>
-        <button class="btn-icon" id="garminBtn" onclick="openGarminCamera()" title="Скан Garmin">📷</button>
-      </div>
-      <input type="file" id="garminCamInput" accept="image/*" style="display:none" onchange="handleGarminPhoto(event)">
-      <div id="garminResult" style="display:none"></div>
-    </div>
-
     <!-- Список еды -->
     <div class="card">
       <div class="sec-hdr">
@@ -276,7 +258,7 @@ input::placeholder{color:var(--muted)}
       </div>
       <div class="food-list" id="foodList"></div>
       <div class="div"></div>
-      <button class="btn btn-full" onclick="closeDay()">Закрыть день</button>
+      <button class="btn btn-full" onclick="openCloseDayModal()">Закрыть день</button>
     </div>
 
   </section>
@@ -359,53 +341,64 @@ input::placeholder{color:var(--muted)}
 
 </div><!-- .app -->
 
-<!-- ═══ EDIT DAY MODAL ═══ -->
-<div id="editModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeEditModal()">
+<!-- CLOSE DAY MODAL -->
+<div id="closeDayModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeCloseDayModal()">
   <div class="modal-box">
     <div class="modal-hdr">
-      <span id="editModalTitle">Редактировать день</span>
-      <button class="modal-close" onclick="closeEditModal()">×</button>
+      <span>Закрыть день</span>
+      <button class="modal-close" onclick="closeCloseDayModal()">×</button>
     </div>
-
-    <div class="modal-sec">КБЖУ</div>
-    <div class="modal-grid">
-      <div class="modal-field"><label>Калории</label><input type="number" id="eKcal" min="0" max="9999"></div>
-      <div class="modal-field"><label>Белок (г)</label><input type="number" id="eProt" min="0" max="999"></div>
-      <div class="modal-field"><label>Жиры (г)</label><input type="number" id="eFat" min="0" max="999"></div>
-      <div class="modal-field"><label>Углеводы (г)</label><input type="number" id="eCarb" min="0" max="999"></div>
-      <div class="modal-field"><label>Дефицит (ккал)</label><input type="number" id="eDeficit" min="-9999" max="9999"></div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Укажи активность за день</p>
+    <div class="act-row">
+      <input type="number" id="actKcal" placeholder="0" min="0" oninput="saveActivity()">
+      <span class="act-lbl">активных ккал</span>
+      <button class="btn-icon" id="garminBtn" onclick="openGarminCamera()" title="Скан Garmin">📷</button>
     </div>
-
-    <div class="modal-sec">Баллы</div>
-    <div class="modal-grid">
-      <div class="modal-field">
-        <label style="color:var(--kcal)">Калории (макс 30)</label>
-        <input type="number" id="eSk" min="-10" max="30" oninput="updateEditTotal()">
-      </div>
-      <div class="modal-field">
-        <label style="color:var(--prot)">Белок (макс 30)</label>
-        <input type="number" id="eSp" min="0" max="30" oninput="updateEditTotal()">
-      </div>
-      <div class="modal-field">
-        <label style="color:var(--clean)">Чистота (макс 25)</label>
-        <input type="number" id="eSc" min="0" max="25" oninput="updateEditTotal()">
-      </div>
-      <div class="modal-field">
-        <label style="color:var(--balance)">БЖУ (макс 15)</label>
-        <input type="number" id="eSb" min="0" max="15" oninput="updateEditTotal()">
-      </div>
-      <div class="modal-field">
-        <label style="color:var(--activity)">Активность (макс 8)</label>
-        <input type="number" id="eSa" min="0" max="20" oninput="updateEditTotal()">
-      </div>
+    <input type="file" id="garminCamInput" accept="image/*" style="display:none" onchange="handleGarminPhoto(event)">
+    <div id="garminResult" style="display:none"></div>
+    <div class="div"></div>
+    <div class="row" style="gap:8px">
+      <button class="btn btn-ghost" style="flex:1" onclick="closeDaySkipActivity()">Пропустить и закрыть</button>
+      <button class="btn" style="flex:1" onclick="closeDaySaveActivity()">Сохранить и закрыть</button>
     </div>
+  </div>
+</div>
 
-    <div class="edit-total">Итог:<strong id="editTotal">0</strong> очков</div>
-
-    <div class="row" style="margin-top:16px">
-      <button class="btn btn-ghost" style="flex:1" onclick="closeEditModal()">Отмена</button>
-      <button class="btn" style="flex:1" onclick="saveEditDay()">Сохранить</button>
+<!-- WEIGHT EDIT MODAL -->
+<div id="weightModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeWeightModal()">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <span id="weightModalTitle" style="font-size:15px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+      <button class="modal-close" onclick="closeWeightModal()">×</button>
     </div>
+    <div style="margin-bottom:16px">
+      <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px">Вес (г)</label>
+      <input type="number" id="weightInput" min="1" max="5000" style="font-size:18px">
+    </div>
+    <div class="row">
+      <button class="btn btn-ghost" style="flex:1" onclick="closeWeightModal()">Отмена</button>
+      <button class="btn" style="flex:1" onclick="saveWeightEdit()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- DAY EDIT MODAL -->
+<div id="dayEditModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeDayEditModal()">
+  <div class="modal-box" style="max-height:85vh;overflow-y:auto">
+    <div class="modal-hdr">
+      <span id="dayEditTitle">Редактировать день</span>
+      <button class="modal-close" onclick="closeDayEditModal()">×</button>
+    </div>
+    <div id="dayEditFoodList"></div>
+    <div style="margin-top:10px">
+      <div class="row">
+        <input type="text" id="dayEditFoodInput" placeholder="добавить продукт…" autocomplete="off">
+        <button class="btn" onclick="dayEditAddFood()">+</button>
+      </div>
+      <div class="status-txt" id="dayEditStatus"></div>
+    </div>
+    <div class="div"></div>
+    <button class="btn btn-full" onclick="closeDayEditModal()">Готово</button>
   </div>
 </div>
 
@@ -519,6 +512,7 @@ const LOOKUP = [
     cleanliness: 'snack'
   },
 ];
+// ✅ Verified КБЖУ: 2026-05-20
 
 function lookupLocal(text) {
   const norm = text.toLowerCase().trim();
@@ -542,7 +536,8 @@ function lookupLocal(text) {
 
   const r = g / 100, p = prod.per100;
   return {
-    name: `${prod.name} ${g}г`,
+    name: prod.name,
+    weight: g,
     kcal: Math.round(p.kcal * r),
     prot: Math.round(p.prot * r * 10) / 10,
     fat:  Math.round(p.fat  * r * 10) / 10,
@@ -568,13 +563,26 @@ let history    = lsGet('history', null) ?? [...PRESET];
 let actKcal    = parseInt(localStorage.getItem('actKcal') || '0');
 let garminDist = parseFloat(localStorage.getItem('garminDist') || '0');
 let chart      = null;
-let _editIdx   = -1;
-let _photoData = null;
+let _weightEditIdx  = -1;
+let _weightEditMode = 'today';
+let _dayEditIdx     = -1;
+let _dayEditFoodIdx = -1;
+let _photoData      = null;
 
 // ═══════════════════════════════════════════
 //  BOOT
 // ═══════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
+  // migrate: add date to old history entries without it
+  let migrated = false;
+  history.forEach((h, i) => {
+    if (!h.date) {
+      h.date = new Date(Date.now() - (history.length - 1 - i) * 86400000).toISOString();
+      migrated = true;
+    }
+  });
+  if (migrated) lsSave('history', history);
+
   const d = new Date();
   document.getElementById('hdrDate').textContent =
     d.toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'});
@@ -801,7 +809,8 @@ function confirmPhotoCard() {
   const wOrig = _photoData.estimated_weight_g || 100;
   const s = wNew / wOrig;
   pushFood({
-    name:        _photoData.name + ' ' + Math.round(wNew) + 'г',
+    name:        _photoData.name,
+    weight:      Math.round(wNew),
     kcal:        Math.round(_photoData.kcal * s),
     prot:        Math.round(_photoData.prot * s * 10) / 10,
     fat:         Math.round(_photoData.fat  * s * 10) / 10,
@@ -890,24 +899,81 @@ function applyGarminData(data) {
 function renderFoods() {
   const el = document.getElementById('foodList');
   if (!foods.length) { el.innerHTML = '<div class="empty">Добавьте первый продукт</div>'; return; }
-  el.innerHTML = foods.map((f,i) => `
-    <div class="food-item">
+  el.innerHTML = foods.map((f,i) => {
+    const wm = !f.weight ? f.name.match(/^(.*?)\s+(\d+(?:\.\d+)?)г$/) : null;
+    const displayName = wm ? wm[1] : f.name;
+    const weight = f.weight ?? (wm ? wm[2] : null);
+    const wSpan = weight ? `<span style="color:var(--muted);font-weight:400;font-size:12px">${weight}г</span>` : '';
+    return `
+    <div class="food-item" onclick="openWeightEdit(${i})" style="cursor:pointer">
       <div class="fi-left">
-        <div class="fi-name">${esc(f.name)}<span class="badge ${f.cleanliness||'clean'}">${clLbl(f.cleanliness)}</span></div>
+        <div class="fi-name">${esc(displayName)}${wSpan}<span class="badge ${f.cleanliness||'clean'}">${clLbl(f.cleanliness)}</span></div>
         <div class="fi-macros">Б${f.prot} · Ж${f.fat} · У${f.carb}</div>
       </div>
       <div class="fi-right">
         <div class="fi-kcal">${f.kcal}</div>
-        <button class="fi-del" onclick="removeFood(${i})" aria-label="Удалить">×</button>
+        <button class="fi-del" onclick="event.stopPropagation();removeFood(${i})" aria-label="Удалить">×</button>
       </div>
     </div>
-  `).join('');
+  `}).join('');
 }
 
 function clLbl(c) { return c==='junk'?'мусор':c==='snack'?'снек':'чистое'; }
 
 function removeFood(i) {
   foods.splice(i,1); lsSave('foods', foods); renderFoods(); updateTotals();
+}
+
+function openWeightEdit(i) {
+  _weightEditIdx = i;
+  const f = foods[i];
+  const wm = !f.weight ? f.name.match(/^(.*?)\s+(\d+(?:\.\d+)?)г$/) : null;
+  const displayName = wm ? wm[1] : f.name;
+  const weight = f.weight ?? (wm ? parseFloat(wm[2]) : null);
+  document.getElementById('weightModalTitle').textContent = displayName;
+  document.getElementById('weightInput').value = weight || '';
+  document.getElementById('weightModal').style.display = 'flex';
+  document.getElementById('weightInput').focus();
+}
+
+function closeWeightModal() {
+  document.getElementById('weightModal').style.display = 'none';
+  _weightEditIdx  = -1;
+  _dayEditFoodIdx = -1;
+  _weightEditMode = 'today';
+}
+
+function saveWeightEdit() {
+  const newW = parseFloat(document.getElementById('weightInput').value);
+  if (!newW || newW <= 0) { toast('Укажите вес'); return; }
+
+  const f = _weightEditMode === 'history'
+    ? history[_dayEditIdx].foods[_dayEditFoodIdx]
+    : foods[_weightEditIdx];
+  if (!f) { closeWeightModal(); return; }
+
+  const wm = !f.weight ? f.name.match(/^(.*?)\s+(\d+(?:\.\d+)?)г$/) : null;
+  const curW = f.weight ?? (wm ? parseFloat(wm[2]) : null);
+  if (!curW) { closeWeightModal(); return; }
+
+  const r100 = 100 / curW, nr = newW / 100;
+  f.kcal  = Math.round(f.kcal * r100 * nr);
+  f.prot  = Math.round(f.prot * r100 * nr * 10) / 10;
+  f.fat   = Math.round(f.fat  * r100 * nr * 10) / 10;
+  f.carb  = Math.round(f.carb * r100 * nr * 10) / 10;
+  f.weight = newW;
+
+  if (_weightEditMode === 'history') {
+    recalcDayTotals(_dayEditIdx);
+    lsSave('history', history);
+    closeWeightModal();
+    renderDayEditFoodList();
+  } else {
+    lsSave('foods', foods);
+    closeWeightModal();
+    renderFoods();
+    updateTotals();
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -943,6 +1009,27 @@ function setBar(id, val, goal, base) {
 function saveActivity() {
   actKcal = parseInt(document.getElementById('actKcal').value) || 0;
   localStorage.setItem('actKcal', actKcal);
+}
+
+function openCloseDayModal() {
+  if (!foods.length) { toast('Нет данных за день'); return; }
+  document.getElementById('closeDayModal').style.display = 'flex';
+}
+
+function closeCloseDayModal() {
+  document.getElementById('closeDayModal').style.display = 'none';
+}
+
+function closeDaySkipActivity() {
+  document.getElementById('actKcal').value = 0;
+  saveActivity();
+  closeCloseDayModal();
+  closeDay();
+}
+
+function closeDaySaveActivity() {
+  closeCloseDayModal();
+  closeDay();
 }
 
 // ═══════════════════════════════════════════
@@ -998,14 +1085,17 @@ function closeDay() {
   const s = calcScore(t.kcal, t.prot, t.fat, t.carb, actKcal, foods, garminDist);
 
   history.push({
-    label:   'День ' + (history.length + 1),
+    date:    new Date().toISOString(),
     kcal:    Math.round(t.kcal),
     prot:    Math.round(t.prot),
     fat:     Math.round(t.fat),
     carb:    Math.round(t.carb),
     deficit: Math.round(s.deficit),
     scores:  [s.sc_k, s.sc_p, s.sc_c, s.sc_b, s.sc_a],
-    total:   s.total
+    total:   s.total,
+    foods:   [...foods],
+    actKcal: actKcal,
+    garminDist: garminDist
   });
   lsSave('history', history);
 
@@ -1031,7 +1121,7 @@ function renderChart() {
   chart = new Chart(ctx, {
     type:'line',
     data:{
-      labels: history.map(h => h.label.replace('День ','Д')),
+      labels: history.map(h => h.date ? fmtDate(h.date) : (h.label||'').replace('День ','Д')),
       datasets:[{
         data: history.map(h=>h.total),
         borderColor:'#f5576c',backgroundColor:'rgba(245,87,108,.12)',
@@ -1054,10 +1144,7 @@ function renderScoreTable() {
   const colors=['var(--kcal)','var(--prot)','var(--clean)','var(--balance)','var(--activity)'];
   document.getElementById('scoreTbody').innerHTML = history.map((h,idx) => `
     <tr>
-      <td style="white-space:nowrap;font-size:11px">
-        ${h.label}
-        <button class="btn-edit" onclick="editDay(${idx})" title="Редактировать">✏️</button>
-      </td>
+      <td style="white-space:nowrap;font-size:11px">${h.date ? fmtDate(h.date) : h.label}</td>
       ${h.scores.map((s,i) => `
         <td>${s}<div class="mbar"><div class="mbar-fill" style="width:${Math.max(0,s/maxVals[i]*100).toFixed(0)}%;background:${colors[i]}"></div></div></td>
       `).join('')}
@@ -1067,61 +1154,148 @@ function renderScoreTable() {
 }
 
 function renderNutriTable() {
-  document.getElementById('nutriTbody').innerHTML = history.map(h => `
-    <tr>
-      <td style="white-space:nowrap;font-size:11px">${h.label}</td>
+  document.getElementById('nutriTbody').innerHTML = history.map((h,idx) => {
+    const diff = G.kcal - h.kcal;
+    const defHtml = diff > 0
+      ? `<span style="color:var(--clean)">−${diff}</span>`
+      : diff < 0
+        ? `<span style="color:var(--kcal)">+${Math.abs(diff)}</span>`
+        : `<span style="color:var(--muted)">0</span>`;
+    return `
+    <tr onclick="openDayEditModal(${idx})" style="cursor:pointer">
+      <td style="white-space:nowrap;font-size:11px">${h.date ? fmtDate(h.date) : h.label}</td>
       <td>${h.kcal}<br><small style="color:var(--muted)">${pct(h.kcal,G.kcal)}</small></td>
       <td>${h.prot}<br><small style="color:var(--muted)">${pct(h.prot,G.prot)}</small></td>
       <td>${h.fat}<br><small style="color:var(--muted)">${pct(h.fat,G.fat)}</small></td>
       <td>${h.carb}<br><small style="color:var(--muted)">${pct(h.carb,G.carb)}</small></td>
-      <td style="color:${h.deficit>=0?'var(--clean)':'var(--kcal)'};font-weight:600">${h.deficit>=0?'+':'-'}${Math.abs(h.deficit)}</td>
+      <td style="font-weight:600">${defHtml}</td>
     </tr>
-  `).join('');
+  `}).join('');
 }
 
 // ═══════════════════════════════════════════
-//  EDIT DAY MODAL
+//  DAY EDIT MODAL
 // ═══════════════════════════════════════════
-function editDay(idx) {
-  _editIdx = idx;
+function getHistory() { return history; }
+function saveHistory(h) { history = h; lsSave('history', history); }
+
+function fmtDate(iso) {
+  const d = new Date(iso);
+  return String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0');
+}
+
+function recalcDayTotals(idx) {
   const h = history[idx];
-  document.getElementById('editModalTitle').textContent = 'Редактировать: ' + h.label;
-  document.getElementById('eKcal').value    = h.kcal;
-  document.getElementById('eProt').value    = h.prot;
-  document.getElementById('eFat').value     = h.fat;
-  document.getElementById('eCarb').value    = h.carb;
-  document.getElementById('eDeficit').value = h.deficit;
-  const ids = ['eSk','eSp','eSc','eSb','eSa'];
-  ids.forEach((id,i) => { document.getElementById(id).value = h.scores[i] ?? 0; });
-  updateEditTotal();
-  document.getElementById('editModal').style.display = 'flex';
+  if (!h.foods || !h.foods.length) return;
+  const t = h.foods.reduce((a,f) => ({
+    kcal: a.kcal+f.kcal, prot: a.prot+f.prot,
+    fat:  a.fat +f.fat,  carb: a.carb+f.carb
+  }), {kcal:0,prot:0,fat:0,carb:0});
+  h.kcal = Math.round(t.kcal);
+  h.prot = Math.round(t.prot * 10) / 10;
+  h.fat  = Math.round(t.fat  * 10) / 10;
+  h.carb = Math.round(t.carb * 10) / 10;
+  const s = calcScore(h.kcal, h.prot, h.fat, h.carb, h.actKcal||0, h.foods, h.garminDist||0);
+  h.deficit = Math.round(s.deficit);
+  h.scores  = [s.sc_k, s.sc_p, s.sc_c, s.sc_b, s.sc_a];
+  h.total   = s.total;
 }
 
-function updateEditTotal() {
-  const sum = ['eSk','eSp','eSc','eSb','eSa']
-    .reduce((a,id) => a + (parseInt(document.getElementById(id).value)||0), 0);
-  document.getElementById('editTotal').textContent = sum;
+function openDayEditModal(idx) {
+  _dayEditIdx = idx;
+  const h = history[idx];
+  const label = h.date ? fmtDate(h.date) : (h.label || ('День ' + (idx+1)));
+  document.getElementById('dayEditTitle').textContent = 'День ' + label;
+  document.getElementById('dayEditFoodInput').value = '';
+  document.getElementById('dayEditStatus').textContent = '';
+  renderDayEditFoodList();
+  document.getElementById('dayEditModal').style.display = 'flex';
 }
 
-function saveEditDay() {
-  if (_editIdx < 0) return;
-  const h = history[_editIdx];
-  h.kcal    = parseInt(document.getElementById('eKcal').value)    || 0;
-  h.prot    = parseInt(document.getElementById('eProt').value)    || 0;
-  h.fat     = parseInt(document.getElementById('eFat').value)     || 0;
-  h.carb    = parseInt(document.getElementById('eCarb').value)    || 0;
-  h.deficit = parseInt(document.getElementById('eDeficit').value) || 0;
-  h.scores  = ['eSk','eSp','eSc','eSb','eSa'].map(id => parseInt(document.getElementById(id).value)||0);
-  h.total   = h.scores.reduce((a,b)=>a+b,0);
-  lsSave('history', history);
-  closeEditModal();
+function closeDayEditModal() {
+  document.getElementById('dayEditModal').style.display = 'none';
+  _dayEditIdx = -1;
   renderHistory();
-  toast('День обновлён');
 }
 
-function closeEditModal() {
-  document.getElementById('editModal').style.display = 'none';
-  _editIdx = -1;
+function renderDayEditFoodList() {
+  const h = history[_dayEditIdx];
+  const fl = h.foods || [];
+  const el = document.getElementById('dayEditFoodList');
+  if (!fl.length) { el.innerHTML = '<div class="empty">Нет продуктов</div>'; return; }
+  el.innerHTML = fl.map((f, i) => {
+    const wm = !f.weight ? f.name.match(/^(.*?)\s+(\d+(?:\.\d+)?)г$/) : null;
+    const displayName = wm ? wm[1] : f.name;
+    const weight = f.weight ?? (wm ? wm[2] : null);
+    const wSpan = weight ? `<span style="color:var(--muted);font-size:12px"> ${weight}г</span>` : '';
+    return `
+      <div class="food-item" onclick="dayEditOpenWeight(${i})" style="cursor:pointer">
+        <div class="fi-left">
+          <div class="fi-name">${esc(displayName)}${wSpan}</div>
+          <div class="fi-macros">Б${f.prot}·Ж${f.fat}·У${f.carb}</div>
+        </div>
+        <div class="fi-right">
+          <span class="fi-kcal">${f.kcal}</span>
+          <button class="fi-del" onclick="event.stopPropagation();dayEditRemoveFood(${i})">×</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function dayEditRemoveFood(foodIdx) {
+  if (!history[_dayEditIdx].foods) return;
+  history[_dayEditIdx].foods.splice(foodIdx, 1);
+  recalcDayTotals(_dayEditIdx);
+  lsSave('history', history);
+  renderDayEditFoodList();
+}
+
+function dayEditOpenWeight(foodIdx) {
+  _dayEditFoodIdx = foodIdx;
+  _weightEditMode = 'history';
+  const f = history[_dayEditIdx].foods[foodIdx];
+  const wm = !f.weight ? f.name.match(/^(.*?)\s+(\d+(?:\.\d+)?)г$/) : null;
+  const displayName = wm ? wm[1] : f.name;
+  const curW = f.weight ?? (wm ? parseFloat(wm[2]) : null);
+  document.getElementById('weightModalTitle').textContent = displayName;
+  document.getElementById('weightInput').value = curW || '';
+  document.getElementById('weightModal').style.display = 'flex';
+  document.getElementById('weightInput').focus();
+}
+
+async function dayEditAddFood() {
+  const input  = document.getElementById('dayEditFoodInput');
+  const status = document.getElementById('dayEditStatus');
+  const text   = input.value.trim();
+  if (!text) return;
+
+  status.textContent = '⏳ Распознаю…';
+  try {
+    let data = lookupLocal(text);
+    let source = '📚';
+    if (!data) {
+      const key = localStorage.getItem('okey');
+      if (!key) { status.textContent = '❌ Не найдено. Добавьте API ключ'; return; }
+      status.textContent = 'Спрашиваю GPT…';
+      data = await callGPT(text, key);
+      source = '🤖';
+    }
+    if (data.error) { status.textContent = '❌ ' + data.error; return; }
+    data.kcal = Math.round(data.kcal);
+    data.prot = Math.round(data.prot * 10) / 10;
+    data.fat  = Math.round(data.fat  * 10) / 10;
+    data.carb = Math.round(data.carb * 10) / 10;
+    if (!history[_dayEditIdx].foods) history[_dayEditIdx].foods = [];
+    history[_dayEditIdx].foods.push(data);
+    recalcDayTotals(_dayEditIdx);
+    lsSave('history', history);
+    input.value = '';
+    status.textContent = source + ' ' + data.name;
+    setTimeout(() => { status.textContent = ''; }, 2000);
+    renderDayEditFoodList();
+  } catch(e) {
+    status.textContent = '❌ ' + (e.message || 'Ошибка');
+  }
 }
 
 // ═══════════════════════════════════════════
