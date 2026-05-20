@@ -112,7 +112,8 @@ input::placeholder{color:var(--muted)}
 /* ── Photo confirmation card ── */
 .photo-card{border-color:var(--balance)!important;animation:slideIn .25s ease}
 .photo-card-hdr{display:flex;align-items:center;gap:8px;margin-bottom:10px}
-.photo-card-hdr .name{font-size:15px;font-weight:700;flex:1}
+.photo-card-hdr .name{font-size:15px;font-weight:700;flex:1;min-width:0;background:transparent;border:none;border-bottom:1.5px solid var(--border);padding:2px 4px;color:var(--fg)}
+.photo-card-hdr .name:focus{outline:none;border-bottom-color:var(--kcal)}
 .photo-weight-row{display:flex;align-items:center;gap:8px;margin-bottom:10px}
 .photo-weight-row label{font-size:12px;color:var(--muted);white-space:nowrap}
 .photo-weight-row input{width:90px;flex:none;font-size:15px;padding:8px 10px}
@@ -120,6 +121,9 @@ input::placeholder{color:var(--muted)}
 .pm-box{background:var(--bg);border-radius:8px;padding:8px 6px;text-align:center}
 .pm-box .v{font-size:17px;font-weight:800}
 .pm-box .l{font-size:10px;color:var(--muted);margin-top:2px}
+.pm-input{width:100%;background:transparent;border:none;border-bottom:1.5px solid var(--border);font-size:17px;font-weight:800;text-align:center;padding:2px 0 1px;color:inherit;box-sizing:border-box;-moz-appearance:textfield}
+.pm-input:focus{outline:none;border-bottom-color:var(--kcal)}
+.pm-input::-webkit-outer-spin-button,.pm-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 
 /* ── Activity ── */
 .act-row{display:flex;align-items:center;gap:8px}
@@ -208,7 +212,7 @@ input::placeholder{color:var(--muted)}
     <!-- Photo confirmation card (hidden until photo taken) -->
     <div id="photoCard" class="card photo-card" style="display:none">
       <div class="photo-card-hdr">
-        <div class="name" id="pcName"></div>
+        <input type="text" id="pcName" class="name" placeholder="Название продукта">
         <span class="badge clean" id="pcBadge"></span>
       </div>
       <div class="photo-weight-row">
@@ -216,7 +220,12 @@ input::placeholder{color:var(--muted)}
         <input type="number" id="pcWeight" min="1" max="2000" oninput="recalcPhoto()">
         <span style="font-size:13px;color:var(--muted)">г</span>
       </div>
-      <div class="photo-macros" id="pcMacros"></div>
+      <div class="photo-macros" id="pcMacros">
+        <div class="pm-box"><input type="number" id="pcKcal" class="pm-input" style="color:var(--kcal)"><div class="l">ккал</div></div>
+        <div class="pm-box"><input type="number" id="pcProt" class="pm-input" style="color:var(--prot)"><div class="l">белок</div></div>
+        <div class="pm-box"><input type="number" id="pcFat"  class="pm-input" style="color:#ffecd2"><div class="l">жиры</div></div>
+        <div class="pm-box"><input type="number" id="pcCarb" class="pm-input" style="color:var(--balance)"><div class="l">углев</div></div>
+      </div>
       <div class="row">
         <button class="btn btn-ghost" style="flex:1" onclick="dismissPhotoCard()">Отмена</button>
         <button class="btn" style="flex:1" onclick="confirmPhotoCard()">Добавить</button>
@@ -691,7 +700,7 @@ function scaleFromPer100(data, grams) {
 }
 
 function showPhotoCard(data) {
-  document.getElementById('pcName').textContent = data.name;
+  document.getElementById('pcName').value = data.name;
   const badge = document.getElementById('pcBadge');
   const lbl = document.getElementById('pcWeightLabel');
   if (data.type === 'label') {
@@ -730,37 +739,21 @@ function recalcPhoto() {
 }
 
 function renderPhotoMacros(d) {
-  document.getElementById('pcMacros').innerHTML = `
-    <div class="pm-box"><div class="v" style="color:var(--kcal)">${Math.round(d.kcal)}</div><div class="l">ккал</div></div>
-    <div class="pm-box"><div class="v" style="color:var(--prot)">${d.prot}</div><div class="l">белок</div></div>
-    <div class="pm-box"><div class="v" style="color:#ffecd2">${d.fat}</div><div class="l">жиры</div></div>
-    <div class="pm-box"><div class="v" style="color:var(--balance)">${d.carb}</div><div class="l">углев</div></div>
-  `;
+  document.getElementById('pcKcal').value = Math.round(d.kcal);
+  document.getElementById('pcProt').value = d.prot;
+  document.getElementById('pcFat').value  = d.fat;
+  document.getElementById('pcCarb').value = d.carb;
 }
 
 function confirmPhotoCard() {
   if (!_photoData) return;
-  const wNew = parseFloat(document.getElementById('pcWeight').value) || 100;
-  let macros;
-  if (_photoData.type === 'label') {
-    macros = scaleFromPer100(_photoData, wNew);
-  } else {
-    const wOrig = _photoData.weight || 100;
-    const s = wNew / wOrig;
-    macros = {
-      kcal: Math.round(_photoData.kcal * s),
-      prot: Math.round(_photoData.prot * s * 10) / 10,
-      fat:  Math.round(_photoData.fat  * s * 10) / 10,
-      carb: Math.round(_photoData.carb * s * 10) / 10,
-    };
-  }
   pushFood({
-    name:        _photoData.name,
-    weight:      Math.round(wNew),
-    kcal:        macros.kcal,
-    prot:        macros.prot,
-    fat:         macros.fat,
-    carb:        macros.carb,
+    name:        (document.getElementById('pcName').value || '').trim() || _photoData.name,
+    weight:      Math.round(parseFloat(document.getElementById('pcWeight').value) || 100),
+    kcal:        Math.round(parseFloat(document.getElementById('pcKcal').value) || 0),
+    prot:        Math.round((parseFloat(document.getElementById('pcProt').value) || 0) * 10) / 10,
+    fat:         Math.round((parseFloat(document.getElementById('pcFat').value)  || 0) * 10) / 10,
+    carb:        Math.round((parseFloat(document.getElementById('pcCarb').value) || 0) * 10) / 10,
     cleanliness: _photoData.cleanliness || 'clean'
   });
   dismissPhotoCard();
