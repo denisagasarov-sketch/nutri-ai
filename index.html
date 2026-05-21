@@ -382,9 +382,27 @@ input::placeholder{color:var(--muted)}
       <span id="weightModalTitle" style="font-size:15px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
       <button class="modal-close" onclick="closeWeightModal()">×</button>
     </div>
-    <div style="margin-bottom:16px">
+    <div style="margin-bottom:12px">
       <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px">Вес (г)</label>
       <input type="number" id="weightInput" min="1" max="5000" style="font-size:18px">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      <div>
+        <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Ккал</label>
+        <input type="number" id="editKcal" min="0" max="9999" step="1" style="font-size:16px">
+      </div>
+      <div>
+        <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Белок (г)</label>
+        <input type="number" id="editProt" min="0" max="999" step="0.1" style="font-size:16px">
+      </div>
+      <div>
+        <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Жиры (г)</label>
+        <input type="number" id="editFat" min="0" max="999" step="0.1" style="font-size:16px">
+      </div>
+      <div>
+        <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Углев (г)</label>
+        <input type="number" id="editCarb" min="0" max="999" step="0.1" style="font-size:16px">
+      </div>
     </div>
     <div class="row">
       <button class="btn btn-ghost" style="flex:1" onclick="closeWeightModal()">Отмена</button>
@@ -435,7 +453,7 @@ input::placeholder{color:var(--muted)}
 // ═══════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════
-const VERSION = '1.0.9';
+const VERSION = '1.1.0';
 const G = { kcal:1800, prot:150, fat:60, carb:165 };
 
 const SYS_PROMPT = `Ты помощник по подсчёту КБЖУ. Отвечай ТОЛЬКО валидным JSON без markdown.
@@ -939,6 +957,10 @@ function openWeightEdit(i) {
   const weight = f.weight ?? (wm ? parseFloat(wm[2]) : null);
   document.getElementById('weightModalTitle').textContent = displayName;
   document.getElementById('weightInput').value = weight || '';
+  document.getElementById('editKcal').value = f.kcal ?? '';
+  document.getElementById('editProt').value = f.prot ?? '';
+  document.getElementById('editFat').value  = f.fat  ?? '';
+  document.getElementById('editCarb').value = f.carb ?? '';
   document.getElementById('weightModal').style.display = 'flex';
   document.getElementById('weightInput').focus();
 }
@@ -951,7 +973,11 @@ function closeWeightModal() {
 }
 
 function saveWeightEdit() {
-  const newW = parseFloat(document.getElementById('weightInput').value);
+  const newW    = parseFloat(document.getElementById('weightInput').value);
+  const newKcal = parseFloat(document.getElementById('editKcal').value);
+  const newProt = parseFloat(document.getElementById('editProt').value);
+  const newFat  = parseFloat(document.getElementById('editFat').value);
+  const newCarb = parseFloat(document.getElementById('editCarb').value);
   if (!newW || newW <= 0) { toast('Укажите вес'); return; }
 
   const f = _weightEditMode === 'history'
@@ -959,16 +985,11 @@ function saveWeightEdit() {
     : foods[_weightEditIdx];
   if (!f) { closeWeightModal(); return; }
 
-  const wm = f.name.match(/^(.*?)\s+(\d+(?:\.\d+)?)г$/);
-  const curW = f.weight ?? (wm ? parseFloat(wm[2]) : null);
-  if (!curW) { closeWeightModal(); return; }
-
-  const r100 = 100 / curW, nr = newW / 100;
-  f.kcal  = Math.round(f.kcal * r100 * nr);
-  f.prot  = Math.round(f.prot * r100 * nr * 10) / 10;
-  f.fat   = Math.round(f.fat  * r100 * nr * 10) / 10;
-  f.carb  = Math.round(f.carb * r100 * nr * 10) / 10;
   f.weight = newW;
+  if (!isNaN(newKcal)) f.kcal = newKcal;
+  if (!isNaN(newProt)) f.prot = newProt;
+  if (!isNaN(newFat))  f.fat  = newFat;
+  if (!isNaN(newCarb)) f.carb = newCarb;
 
   if (_weightEditMode === 'history') {
     recalcDayTotals(_dayEditIdx);
@@ -1266,6 +1287,10 @@ function dayEditOpenWeight(foodIdx) {
   const curW = f.weight ?? (wm ? parseFloat(wm[2]) : null);
   document.getElementById('weightModalTitle').textContent = displayName;
   document.getElementById('weightInput').value = curW || '';
+  document.getElementById('editKcal').value = f.kcal ?? '';
+  document.getElementById('editProt').value = f.prot ?? '';
+  document.getElementById('editFat').value  = f.fat  ?? '';
+  document.getElementById('editCarb').value = f.carb ?? '';
   document.getElementById('weightModal').style.display = 'flex';
   document.getElementById('weightInput').focus();
 }
