@@ -283,8 +283,8 @@ input::placeholder{color:var(--muted)}
             <th>День</th>
             <th style="color:var(--kcal)">Ккал</th>
             <th style="color:var(--prot)">Белок</th>
-            <th style="color:var(--clean)">Чист.</th>
             <th style="color:var(--balance)">БЖУ</th>
+            <th style="color:var(--clean)">Чист.</th>
             <th style="color:var(--activity)">Акт.</th>
             <th>∑</th>
           </tr>
@@ -449,7 +449,7 @@ input::placeholder{color:var(--muted)}
 // ═══════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════
-const VERSION = '1.1.1';
+const VERSION = '1.1.2';
 const G = { kcal:1800, prot:150, fat:60, carb:165 };
 
 const SYS_PROMPT = `Ты помощник по подсчёту КБЖУ. Отвечай ТОЛЬКО валидным JSON без markdown.
@@ -988,47 +988,77 @@ function closeDaySaveActivity() {
 // ═══════════════════════════════════════════
 //  SCORING
 // ═══════════════════════════════════════════
-function activityBonus(actKcal) {
-  if (actKcal >= 500) return 10;
-  if (actKcal >= 350) return 5;
-  if (actKcal >= 200) return 3;
-  return 0;
-}
+function calcScores(day) {
+  // 1. КАЛОРИИ (40пт)
+  const kcalEaten = day.kcal || 0;
+  let kcalPts;
+  if (kcalEaten <= 1800)       kcalPts = 40;
+  else if (kcalEaten <= 1850)  kcalPts = 36;
+  else if (kcalEaten <= 1950)  kcalPts = 30;
+  else if (kcalEaten <= 2050)  kcalPts = 22;
+  else if (kcalEaten <= 2150)  kcalPts = 14;
+  else if (kcalEaten <= 2300)  kcalPts = 7;
+  else                         kcalPts = 3;
 
-function calcScore(kcal, prot, fat, carb, act, foodList) {
-  const deficit = G.kcal - kcal;
+  // 2. БЕЛОК (35пт)
+  const prot = day.prot || 0;
+  let protPts;
+  if (prot >= 150)      protPts = 35;
+  else if (prot >= 130) protPts = 28;
+  else if (prot >= 110) protPts = 18;
+  else if (prot >= 90)  protPts = 9;
+  else                  protPts = 3;
 
-  let sc_k;
-  if      (deficit>=500) sc_k=30;
-  else if (deficit>=300) sc_k=28;
-  else if (deficit>=100) sc_k=25;
-  else if (deficit>=0)   sc_k=20;
-  else if (deficit>=-100)sc_k=15;
-  else if (deficit>=-300)sc_k=5;
-  else                   sc_k=-10;
-
-  let sc_p;
-  if      (prot>=150) sc_p=30;
-  else if (prot>=130) sc_p=25;
-  else if (prot>=100) sc_p=15;
-  else                sc_p=5;
-
-  let sc_c=25;
-  if (foodList && foodList.length) {
-    const n=foodList.length;
-    const junkR=foodList.filter(f=>f.cleanliness==='junk').length/n;
-    if      (junkR>0.3) sc_c=7;
-    else if (junkR>0)   sc_c=13;
-    else sc_c = foodList.filter(f=>f.cleanliness==='clean').length/n>=0.7 ? 25 : 18;
+  // 3. БАЛАНС БЖУ (15пт) — отклонение реальных пропорций от идеала
+  const totalKcal = (day.prot||0)*4 + (day.fat||0)*9 + (day.carb||0)*4;
+  let balancePts = 0;
+  if (totalKcal > 0) {
+    const bPct = ((day.prot||0)*4) / totalKcal * 100;
+    const fPct = ((day.fat||0)*9)  / totalKcal * 100;
+    const cPct = ((day.carb||0)*4) / totalKcal * 100;
+    const avgDev = (Math.abs(bPct-33) + Math.abs(fPct-30) + Math.abs(cPct-37)) / 3;
+    if (avgDev <= 5)       balancePts = 15;
+    else if (avgDev <= 10) balancePts = 11;
+    else if (avgDev <= 20) balancePts = 6;
+    else                   balancePts = 0;
   }
 
-  const inRange = r => r>=0.8 && r<=1.1;
-  const hit = [prot/G.prot, fat/G.fat, carb/G.carb].filter(inRange).length;
-  const sc_b = hit>=3?15:hit>=2?10:hit>=1?5:0;
+  // 4. ЧИСТОТА (10пт) — доля снек-калорий
+  const snackKcal = (day.foods || [])
+    .filter(f => f.cleanliness === 'snack' || f.cleanliness === 'junk')
+    .reduce((s, f) => s + (f.kcal || 0), 0);
+  const snackPct = totalKcal > 0 ? snackKcal / kcalEaten * 100 : 0;
+  let cleanPts;
+  if (snackPct === 0)       cleanPts = 10;
+  else if (snackPct <= 5)   cleanPts = 9;
+  else if (snackPct <= 15)  cleanPts = 7;
+  else if (snackPct <= 25)  cleanPts = 4;
+  else if (snackPct <= 40)  cleanPts = 1;
+  else                      cleanPts = 0;
 
-  const sc_a = activityBonus(act);
+  // 5. АКТИВНОСТЬ — бонус
+  const actKcal = day.actKcal || 0;
+  let actBonus;
+  if (actKcal >= 500)      actBonus = 15;
+  else if (actKcal >= 350) actBonus = 11;
+  else if (actKcal >= 200) actBonus = 7;
+  else if (actKcal >= 100) actBonus = 3;
+  else                     actBonus = 0;
 
-  return { sc_k, sc_p, sc_c, sc_b, sc_a, total:sc_k+sc_p+sc_c+sc_b+sc_a, deficit };
+  // 6. ТЕМП ПОТЕРИ ЖИРА
+  const effKcal = kcalEaten - actKcal;
+  const deficit = 1800 - effKcal;
+  const kgPerMonth = Math.round(deficit * 30 / 7700 * 10) / 10;
+
+  const nutritionScore = kcalPts + protPts + balancePts + cleanPts;
+  const dayScore = nutritionScore + actBonus;
+
+  return {
+    scores:     [kcalPts, protPts, balancePts, cleanPts, actBonus],
+    total:      nutritionScore,
+    dayTotal:   dayScore,
+    kgPerMonth: kgPerMonth
+  };
 }
 
 // ═══════════════════════════════════════════
@@ -1037,19 +1067,21 @@ function calcScore(kcal, prot, fat, carb, act, foodList) {
 function closeDay() {
   if (!foods.length) { toast('Нет данных за день'); return; }
   const t = foods.reduce((a,f)=>({kcal:a.kcal+f.kcal,prot:a.prot+f.prot,fat:a.fat+f.fat,carb:a.carb+f.carb}),{kcal:0,prot:0,fat:0,carb:0});
-  const s = calcScore(t.kcal, t.prot, t.fat, t.carb, actKcal, foods);
+  const dayObj = { kcal: Math.round(t.kcal), prot: Math.round(t.prot), fat: Math.round(t.fat), carb: Math.round(t.carb), actKcal, foods };
+  const r = calcScores(dayObj);
 
   history.push({
-    date:    new Date().toISOString(),
-    kcal:    Math.round(t.kcal),
-    prot:    Math.round(t.prot),
-    fat:     Math.round(t.fat),
-    carb:    Math.round(t.carb),
-    deficit: Math.round(s.deficit),
-    scores:  [s.sc_k, s.sc_p, s.sc_c, s.sc_b, s.sc_a],
-    total:   s.total,
-    foods:   [...foods],
-    actKcal: actKcal
+    date:       new Date().toISOString(),
+    kcal:       dayObj.kcal,
+    prot:       dayObj.prot,
+    fat:        dayObj.fat,
+    carb:       dayObj.carb,
+    deficit:    Math.round(G.kcal - dayObj.kcal),
+    scores:     r.scores,
+    total:      r.dayTotal,
+    kgPerMonth: r.kgPerMonth,
+    foods:      [...foods],
+    actKcal:    actKcal
   });
   lsSave('history', history);
 
@@ -1059,7 +1091,7 @@ function closeDay() {
   document.getElementById('actKcal').value='';
   dismissPhotoCard();
   renderFoods(); updateTotals();
-  toast(`День закрыт! Балл: ${s.total} очков`);
+  toast(`День закрыт! Питание: ${r.total}/100, День: ${r.dayTotal}/115`);
 }
 
 // ═══════════════════════════════════════════
@@ -1085,15 +1117,15 @@ function renderChart() {
       plugins:{legend:{display:false},tooltip:{backgroundColor:'#1a1a2e',borderColor:'#2a2a4a',borderWidth:1,titleColor:'#e0e0ff',bodyColor:'#a0a0cc'}},
       scales:{
         x:{ticks:{color:'#7070a0',font:{size:10}},grid:{color:'rgba(42,42,74,.5)'}},
-        y:{ticks:{color:'#7070a0',font:{size:10}},grid:{color:'rgba(42,42,74,.5)'},min:0,max:110}
+        y:{ticks:{color:'#7070a0',font:{size:10}},grid:{color:'rgba(42,42,74,.5)'},min:0,max:115}
       }
     }
   });
 }
 
 function renderScoreTable() {
-  const maxVals=[30,30,25,15,8];
-  const colors=['var(--kcal)','var(--prot)','var(--clean)','var(--balance)','var(--activity)'];
+  const maxVals=[40,35,15,10,15];
+  const colors=['var(--kcal)','var(--prot)','var(--balance)','var(--clean)','var(--activity)'];
   document.getElementById('scoreTbody').innerHTML = history.map((h,idx) => `
     <tr>
       <td style="white-space:nowrap;font-size:11px">${h.date ? fmtDate(h.date) : h.label}</td>
@@ -1147,10 +1179,11 @@ function recalcDayTotals(idx) {
   h.prot = Math.round(t.prot * 10) / 10;
   h.fat  = Math.round(t.fat  * 10) / 10;
   h.carb = Math.round(t.carb * 10) / 10;
-  const s = calcScore(h.kcal, h.prot, h.fat, h.carb, h.actKcal||0, h.foods);
-  h.deficit = Math.round(s.deficit);
-  h.scores  = [s.sc_k, s.sc_p, s.sc_c, s.sc_b, s.sc_a];
-  h.total   = s.total;
+  const r = calcScores(h);
+  h.deficit    = Math.round(G.kcal - h.kcal);
+  h.scores     = r.scores;
+  h.total      = r.dayTotal;
+  h.kgPerMonth = r.kgPerMonth;
 }
 
 function openDayEditModal(idx) {
@@ -1168,11 +1201,11 @@ function openDayEditModal(idx) {
 function closeDayEditModal() {
   if (_dayEditIdx >= 0) {
     const h = history[_dayEditIdx];
-    const newAct = parseInt(document.getElementById('dayEditActKcal').value) || 0;
-    h.actKcal = newAct;
-    if (!h.scores) h.scores = [0,0,0,0,0];
-    h.scores[4] = activityBonus(newAct);
-    h.total = h.scores.reduce((a,b) => a+b, 0);
+    h.actKcal = parseInt(document.getElementById('dayEditActKcal').value) || 0;
+    const r = calcScores(h);
+    h.scores     = r.scores;
+    h.total      = r.dayTotal;
+    h.kgPerMonth = r.kgPerMonth;
     lsSave('history', history);
   }
   document.getElementById('dayEditModal').style.display = 'none';
