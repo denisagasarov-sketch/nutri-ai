@@ -131,11 +131,6 @@ input::placeholder{color:var(--muted)}
 .act-row input{width:100px;flex:none}
 .act-lbl{font-size:13px;color:var(--muted);flex:1}
 
-/* ── Garmin result ── */
-.garmin-result{background:var(--bg);border-radius:10px;padding:10px 12px;margin-top:10px}
-.garmin-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
-.garmin-chip{background:rgba(240,147,251,.12);color:var(--activity);border-radius:6px;padding:3px 8px;font-size:12px;font-weight:600}
-.garmin-bonus{font-size:12px;color:var(--clean);font-weight:700}
 
 /* ── Divider ── */
 .div{height:1px;background:var(--border);margin:12px 0}
@@ -362,11 +357,8 @@ input::placeholder{color:var(--muted)}
     <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Укажи активность за день</p>
     <div class="act-row">
       <input type="number" id="actKcal" placeholder="0" min="0" oninput="saveActivity()">
-      <span class="act-lbl">активных ккал</span>
-      <button class="btn-icon" id="garminBtn" onclick="openGarminCamera()" title="Скан Garmin">📷</button>
+      <span class="act-lbl">активных ккал (из Garmin)</span>
     </div>
-    <input type="file" id="garminCamInput" accept="image/*" style="display:none" onchange="handleGarminPhoto(event)">
-    <div id="garminResult" style="display:none"></div>
     <div class="div"></div>
     <div class="row" style="gap:8px">
       <button class="btn btn-ghost" style="flex:1" onclick="closeDaySkipActivity()">Пропустить и закрыть</button>
@@ -427,6 +419,10 @@ input::placeholder{color:var(--muted)}
       <div class="status-txt" id="dayEditStatus"></div>
     </div>
     <div class="div"></div>
+    <div style="margin-bottom:14px">
+      <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px">Активных ккал (Garmin)</label>
+      <input type="number" id="dayEditActKcal" min="0" placeholder="0" style="font-size:16px;width:100%;box-sizing:border-box">
+    </div>
     <button class="btn btn-full" onclick="closeDayEditModal()">Готово</button>
   </div>
 </div>
@@ -453,7 +449,7 @@ input::placeholder{color:var(--muted)}
 // ═══════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════
-const VERSION = '1.1.0';
+const VERSION = '1.1.1';
 const G = { kcal:1800, prot:150, fat:60, carb:165 };
 
 const SYS_PROMPT = `Ты помощник по подсчёту КБЖУ. Отвечай ТОЛЬКО валидным JSON без markdown.
@@ -483,8 +479,6 @@ const FOOD_VISION_PROMPT = `Прочитай этикетку на фото. В�
 {"name":"название продукта на русском","kcal_per_serving":число,"prot_per_serving":число,"fat_per_serving":число,"carb_per_serving":число,"serving_g":число}
 Переписывай цифры точно как на этикетке, без округлений и пересчётов.`;
 
-const GARMIN_PROMPT = `This is a Garmin fitness tracker screenshot. Extract these exact values and return ONLY valid JSON without markdown: {"active_kcal":number,"total_kcal":number,"steps":number,"distance_km":number,"active_minutes":number,"body_battery":number,"sleep_score":number} If a value is not visible return null.`;
-
 // ═══════════════════════════════════════════
 //  PRESET & STATE
 // ═══════════════════════════════════════════
@@ -498,8 +492,7 @@ const PRESET = [
 
 let foods      = lsGet('foods',   []);
 let history    = lsGet('history', null) ?? [...PRESET];
-let actKcal    = parseInt(localStorage.getItem('actKcal') || '0');
-let garminDist = parseFloat(localStorage.getItem('garminDist') || '0');
+let actKcal = parseInt(localStorage.getItem('actKcal') || '0');
 let chart      = null;
 let _weightEditIdx  = -1;
 let _weightEditMode = 'today';
@@ -851,74 +844,6 @@ function dismissPhotoCard() {
 }
 
 // ═══════════════════════════════════════════
-//  GARMIN SCREENSHOT RECOGNITION
-// ═══════════════════════════════════════════
-function openGarminCamera() {
-  if (!localStorage.getItem('okey')) { toast('Добавьте API ключ в Настройках'); return; }
-  document.getElementById('garminCamInput').click();
-}
-
-async function handleGarminPhoto(e) {
-  const file = e.target.files[0];
-  e.target.value = '';
-  if (!file) return;
-
-  const btn = document.getElementById('garminBtn');
-  const res = document.getElementById('garminResult');
-  btn.disabled = true; btn.textContent = '⏳';
-  res.style.display = 'block';
-  res.innerHTML = '<div style="font-size:12px;color:var(--muted)">⏳ Читаю скриншот Garmin…</div>';
-
-  try {
-    const { base64, mimeType } = await fileToBase64(file);
-    const data = await callVision(base64, mimeType, GARMIN_PROMPT);
-    applyGarminData(data);
-  } catch(err) {
-    res.innerHTML = `<div style="font-size:12px;color:var(--kcal)">❌ ${esc(err.message||'Ошибка')}</div>`;
-  }
-
-  btn.disabled = false; btn.textContent = '📷';
-}
-
-function applyGarminData(data) {
-  // Auto-fill active kcal
-  if (data.active_kcal != null) {
-    actKcal = Math.round(data.active_kcal);
-    localStorage.setItem('actKcal', actKcal);
-    document.getElementById('actKcal').value = actKcal;
-  }
-  // Store distance for scoring
-  garminDist = data.distance_km || 0;
-  localStorage.setItem('garminDist', garminDist);
-
-  // Activity bonus preview
-  const act = data.active_kcal || 0;
-  const dist = data.distance_km || 0;
-  let bonus = 0;
-  if (act > 0) {
-    if      (act < 200) bonus = 3;
-    else if (act < 350) bonus = 5;
-    else                bonus = dist >= 5 ? 8 : 5;
-  }
-
-  const chips = [];
-  if (data.active_kcal  != null) chips.push(`🔥 ${data.active_kcal} ккал`);
-  if (data.steps        != null) chips.push(`👟 ${data.steps.toLocaleString('ru')} шаг`);
-  if (data.distance_km  != null) chips.push(`📍 ${data.distance_km} км`);
-  if (data.active_minutes != null) chips.push(`⏱ ${data.active_minutes} мин`);
-  if (data.body_battery != null) chips.push(`⚡ ${data.body_battery}`);
-  if (data.sleep_score  != null) chips.push(`😴 сон ${data.sleep_score}`);
-
-  const res = document.getElementById('garminResult');
-  res.innerHTML = `
-    <div class="garmin-result">
-      <div class="garmin-chips">${chips.map(c=>`<span class="garmin-chip">${c}</span>`).join('')}</div>
-      ${bonus > 0 ? `<div class="garmin-bonus">Бонус активности: +${bonus} очков</div>` : ''}
-    </div>
-  `;
-}
-
-// ═══════════════════════════════════════════
 //  RENDER FOOD LIST
 // ═══════════════════════════════════════════
 function renderFoods() {
@@ -1063,7 +988,14 @@ function closeDaySaveActivity() {
 // ═══════════════════════════════════════════
 //  SCORING
 // ═══════════════════════════════════════════
-function calcScore(kcal, prot, fat, carb, act, foodList, distKm) {
+function activityBonus(actKcal) {
+  if (actKcal >= 500) return 10;
+  if (actKcal >= 350) return 5;
+  if (actKcal >= 200) return 3;
+  return 0;
+}
+
+function calcScore(kcal, prot, fat, carb, act, foodList) {
   const deficit = G.kcal - kcal;
 
   let sc_k;
@@ -1094,12 +1026,7 @@ function calcScore(kcal, prot, fat, carb, act, foodList, distKm) {
   const hit = [prot/G.prot, fat/G.fat, carb/G.carb].filter(inRange).length;
   const sc_b = hit>=3?15:hit>=2?10:hit>=1?5:0;
 
-  let sc_a=0;
-  if (act>0) {
-    if      (act<200) sc_a=3;
-    else if (act<350) sc_a=5;
-    else              sc_a=(distKm && distKm>=5)?8:5;
-  }
+  const sc_a = activityBonus(act);
 
   return { sc_k, sc_p, sc_c, sc_b, sc_a, total:sc_k+sc_p+sc_c+sc_b+sc_a, deficit };
 }
@@ -1110,7 +1037,7 @@ function calcScore(kcal, prot, fat, carb, act, foodList, distKm) {
 function closeDay() {
   if (!foods.length) { toast('Нет данных за день'); return; }
   const t = foods.reduce((a,f)=>({kcal:a.kcal+f.kcal,prot:a.prot+f.prot,fat:a.fat+f.fat,carb:a.carb+f.carb}),{kcal:0,prot:0,fat:0,carb:0});
-  const s = calcScore(t.kcal, t.prot, t.fat, t.carb, actKcal, foods, garminDist);
+  const s = calcScore(t.kcal, t.prot, t.fat, t.carb, actKcal, foods);
 
   history.push({
     date:    new Date().toISOString(),
@@ -1122,17 +1049,14 @@ function closeDay() {
     scores:  [s.sc_k, s.sc_p, s.sc_c, s.sc_b, s.sc_a],
     total:   s.total,
     foods:   [...foods],
-    actKcal: actKcal,
-    garminDist: garminDist
+    actKcal: actKcal
   });
   lsSave('history', history);
 
-  foods=[];actKcal=0;garminDist=0;
+  foods=[];actKcal=0;
   lsSave('foods',foods);
   localStorage.setItem('actKcal','0');
-  localStorage.setItem('garminDist','0');
   document.getElementById('actKcal').value='';
-  document.getElementById('garminResult').style.display='none';
   dismissPhotoCard();
   renderFoods(); updateTotals();
   toast(`День закрыт! Балл: ${s.total} очков`);
@@ -1223,7 +1147,7 @@ function recalcDayTotals(idx) {
   h.prot = Math.round(t.prot * 10) / 10;
   h.fat  = Math.round(t.fat  * 10) / 10;
   h.carb = Math.round(t.carb * 10) / 10;
-  const s = calcScore(h.kcal, h.prot, h.fat, h.carb, h.actKcal||0, h.foods, h.garminDist||0);
+  const s = calcScore(h.kcal, h.prot, h.fat, h.carb, h.actKcal||0, h.foods);
   h.deficit = Math.round(s.deficit);
   h.scores  = [s.sc_k, s.sc_p, s.sc_c, s.sc_b, s.sc_a];
   h.total   = s.total;
@@ -1236,11 +1160,21 @@ function openDayEditModal(idx) {
   document.getElementById('dayEditTitle').textContent = 'День ' + label;
   document.getElementById('dayEditFoodInput').value = '';
   document.getElementById('dayEditStatus').textContent = '';
+  document.getElementById('dayEditActKcal').value = h.actKcal || 0;
   renderDayEditFoodList();
   document.getElementById('dayEditModal').style.display = 'flex';
 }
 
 function closeDayEditModal() {
+  if (_dayEditIdx >= 0) {
+    const h = history[_dayEditIdx];
+    const newAct = parseInt(document.getElementById('dayEditActKcal').value) || 0;
+    h.actKcal = newAct;
+    if (!h.scores) h.scores = [0,0,0,0,0];
+    h.scores[4] = activityBonus(newAct);
+    h.total = h.scores.reduce((a,b) => a+b, 0);
+    lsSave('history', history);
+  }
   document.getElementById('dayEditModal').style.display = 'none';
   _dayEditIdx = -1;
   renderHistory();
@@ -1335,12 +1269,10 @@ async function dayEditAddFood() {
 // ═══════════════════════════════════════════
 function resetDay() {
   if (!confirm('Сбросить все данные за сегодня?')) return;
-  foods=[]; actKcal=0; garminDist=0;
+  foods=[]; actKcal=0;
   lsSave('foods',foods);
   localStorage.setItem('actKcal','0');
-  localStorage.setItem('garminDist','0');
   document.getElementById('actKcal').value='';
-  document.getElementById('garminResult').style.display='none';
   dismissPhotoCard();
   renderFoods(); updateTotals();
   toast('День сброшен');
