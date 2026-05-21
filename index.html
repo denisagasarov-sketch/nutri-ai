@@ -570,7 +570,7 @@ input::placeholder{color:var(--muted)}
 // ═══════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════
-const VERSION = '1.1.6';
+const VERSION = '1.1.7';
 const G = { kcal:1800, prot:150, fat:60, carb:165 };
 
 const SYS_PROMPT = `Ты помощник по подсчёту КБЖУ. Отвечай ТОЛЬКО валидным JSON без markdown.
@@ -1365,7 +1365,8 @@ function renderChart() {
           backgroundColor: 'transparent',
           borderWidth: 2.5,
           pointBackgroundColor: '#a78bfa',
-          pointRadius: 4,
+          pointRadius: 3,
+          pointHoverRadius: 5,
           tension: 0.4,
           yAxisID: 'y',
           order: 2
@@ -1377,7 +1378,8 @@ function renderChart() {
           borderWidth: 2.5,
           pointBackgroundColor: history.map(h => (h.kgPerMonth||0) < 0 ? '#1D9E75' : '#E24B4A'),
           pointBorderColor:     history.map(h => (h.kgPerMonth||0) < 0 ? '#1D9E75' : '#E24B4A'),
-          pointRadius: 5,
+          pointRadius: 3,
+          pointHoverRadius: 5,
           tension: 0.4,
           backgroundColor: 'transparent',
           yAxisID: 'y2',
