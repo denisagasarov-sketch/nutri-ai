@@ -593,7 +593,7 @@ input::placeholder{color:var(--muted)}
 // ═══════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════
-const VERSION = '1.2.3';
+const VERSION = '1.2.4';
 const G = { kcal:1800, prot:150, fat:60, carb:165 };
 
 const SYS_PROMPT = `Ты помощник по подсчёту КБЖУ. Отвечай ТОЛЬКО валидным JSON без markdown.
@@ -630,8 +630,8 @@ const PRESET = [
   {date:'2026-05-15T12:00:00.000Z',kcal:2211,prot:122,fat:105,carb:95, deficit:-411,actKcal:0,  garminDist:0,   foods:[],scores:[10,15,5,2,0], total:32, kgPerMonth: 1.6},
   {date:'2026-05-16T12:00:00.000Z',kcal:2145,prot:167,fat:95, carb:55, deficit:-345,actKcal:0,  garminDist:0,   foods:[],scores:[10,25,5,2,0], total:42, kgPerMonth: 1.3},
   {date:'2026-05-17T12:00:00.000Z',kcal:1935,prot:172,fat:53, carb:167,deficit:-135,actKcal:0,  garminDist:0,   foods:[],scores:[20,30,18,7,0], total:75, kgPerMonth: 0.5},
-  {date:'2026-05-18T12:00:00.000Z',kcal:1730,prot:187,fat:28, carb:167,deficit:70,  actKcal:339,garminDist:4.97,foods:[],scores:[28,30,20,8,5], total:91, kgPerMonth:-1.6},
-  {date:'2026-05-19T12:00:00.000Z',kcal:2070,prot:181,fat:61, carb:175,deficit:-270,actKcal:369,garminDist:5.48,foods:[],scores:[25,30,22,8,8], total:93, kgPerMonth:-0.4}
+  {date:'2026-05-18T12:00:00.000Z',kcal:1730,prot:187,fat:28, carb:167,deficit:70,  actKcal:339,garminDist:4.97,foods:[],scores:[28,30,20,8,4], total:90, kgPerMonth:-1.6},
+  {date:'2026-05-19T12:00:00.000Z',kcal:2070,prot:181,fat:61, carb:175,deficit:-270,actKcal:369,garminDist:5.48,foods:[],scores:[25,30,22,8,4], total:89, kgPerMonth:-0.4}
 ];
 
 let foods      = lsGet('foods',   []);
@@ -1181,6 +1181,16 @@ function closeDaySaveActivity() {
 // ═══════════════════════════════════════════
 //  SCORING
 // ═══════════════════════════════════════════
+function activityBonus(actKcal) {
+  if (actKcal >= 800) return 15;
+  if (actKcal >= 700) return 12;
+  if (actKcal >= 600) return 10;
+  if (actKcal >= 500) return 8;
+  if (actKcal >= 400) return 6;
+  if (actKcal >= 300) return 4;
+  return 0;
+}
+
 function calcScores(day) {
   // 1. КАЛОРИИ (40пт)
   const kcalEaten = day.kcal || 0;
@@ -1231,12 +1241,7 @@ function calcScores(day) {
 
   // 5. АКТИВНОСТЬ — бонус
   const actKcal = day.actKcal || 0;
-  let actBonus;
-  if (actKcal >= 500)      actBonus = 15;
-  else if (actKcal >= 350) actBonus = 11;
-  else if (actKcal >= 200) actBonus = 7;
-  else if (actKcal >= 100) actBonus = 3;
-  else                     actBonus = 0;
+  const actBonus = activityBonus(actKcal);
 
   // 6. ТЕМП ПОТЕРИ ЖИРА
   const effKcal = kcalEaten - actKcal;
