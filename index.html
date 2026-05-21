@@ -181,6 +181,14 @@ input::placeholder{color:var(--muted)}
 #scoreChart{height:320px!important}
 @media(max-width:420px){#scoreChart{height:280px!important}}
 
+/* ── Day view nav & animation ── */
+.ds-nav-btn{background:none;border:none;font-size:26px;line-height:1;padding:4px 10px;cursor:pointer;color:var(--text);transition:color .15s;flex-shrink:0}
+.ds-nav-btn.dim{color:var(--border);pointer-events:none}
+@keyframes dsSlideLeft{from{transform:translateX(48px);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes dsSlideRight{from{transform:translateX(-48px);opacity:0}to{transform:translateX(0);opacity:1}}
+.ds-anim-left{animation:dsSlideLeft .22s ease}
+.ds-anim-right{animation:dsSlideRight .22s ease}
+
 /* ── Day score page ── */
 .ds-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
 .ds-box{background:var(--bg);border-radius:12px;padding:14px 10px;text-align:center}
@@ -290,9 +298,19 @@ input::placeholder{color:var(--muted)}
   <!-- ═══ DAY SCORE ═══ -->
   <section class="sec" id="sec-day">
 
+    <!-- Date nav -->
+    <div class="card" style="padding:10px 14px;margin-bottom:10px">
+      <div style="display:flex;align-items:center">
+        <button class="ds-nav-btn dim" id="ds-prev-btn" onclick="navigateDayPrev()">‹</button>
+        <span id="ds-date-lbl" style="flex:1;text-align:center;font-size:15px;font-weight:700">Сегодня</span>
+        <button class="ds-nav-btn dim" id="ds-next-btn" onclick="navigateDayNext()">›</button>
+      </div>
+    </div>
+
+    <div id="day-content">
+
     <!-- Summary -->
     <div class="card">
-      <div class="card-ttl">Балл дня</div>
       <div class="ds-summary">
         <div class="ds-box">
           <div class="ds-lbl">Питание</div>
@@ -373,6 +391,7 @@ input::placeholder{color:var(--muted)}
       </div>
     </div>
 
+    </div><!-- #day-content -->
   </section>
 
   <!-- ═══ HISTORY ═══ -->
@@ -574,7 +593,7 @@ input::placeholder{color:var(--muted)}
 // ═══════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════
-const VERSION = '1.2.1';
+const VERSION = '1.2.2';
 const G = { kcal:1800, prot:150, fat:60, carb:165 };
 
 const SYS_PROMPT = `Ты помощник по подсчёту КБЖУ. Отвечай ТОЛЬКО валидным JSON без markdown.
@@ -624,6 +643,8 @@ let _weightEditMode = 'today';
 let _dayEditIdx     = -1;
 let _dayEditFoodIdx = -1;
 let _photoData      = null;
+let _dayViewIdx     = -1;
+let _swipeStartX    = 0;
 
 // ═══════════════════════════════════════════
 //  BOOT
@@ -682,6 +703,14 @@ document.addEventListener('DOMContentLoaded', () => {
     d.toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'}) + ' · v' + VERSION;
   if (actKcal) document.getElementById('actKcal').value = actKcal;
   document.getElementById('foodInput').addEventListener('keydown', e => { if (e.key==='Enter') addFood(); });
+  const daySection = document.getElementById('sec-day');
+  daySection.addEventListener('touchstart', e => { _swipeStartX = e.touches[0].clientX; }, { passive: true });
+  daySection.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - _swipeStartX;
+    if (Math.abs(dx) < 50) return;
+    if (dx < 0) navigateDayNext();
+    if (dx > 0) navigateDayPrev();
+  });
   renderKey();
   renderFoods();
   updateTotals();
@@ -697,7 +726,7 @@ function goTo(name) {
   document.getElementById('sec-' + name).classList.add('active');
   document.getElementById('nav-' + name).classList.add('active');
   if (name === 'history') renderHistory();
-  if (name === 'day')     renderDayScore();
+  if (name === 'day')     renderDayView();
 }
 
 // ═══════════════════════════════════════════
@@ -1264,27 +1293,92 @@ function closeDay() {
 // ═══════════════════════════════════════════
 //  DAY SCORE PAGE
 // ═══════════════════════════════════════════
-function renderDayScore() {
-  const t = foods.reduce((a,f) => ({
-    kcal: a.kcal+f.kcal, prot: a.prot+f.prot, fat: a.fat+f.fat, carb: a.carb+f.carb
-  }), {kcal:0, prot:0, fat:0, carb:0});
+function fmtDateFull(iso) {
+  const d = new Date(iso);
+  const months = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+  return d.getDate() + ' ' + months[d.getMonth()];
+}
 
-  const dayObj = {
-    kcal: Math.round(t.kcal), prot: Math.round(t.prot),
-    fat:  Math.round(t.fat),  carb: Math.round(t.carb),
-    actKcal, foods
-  };
+function _animateDayContent(dir) {
+  const el = document.getElementById('day-content');
+  el.classList.remove('ds-anim-left', 'ds-anim-right');
+  void el.offsetWidth; // force reflow
+  el.classList.add(dir === 'left' ? 'ds-anim-left' : 'ds-anim-right');
+}
+
+function navigateDayPrev() {
+  if (_dayViewIdx === -1) {
+    if (!history.length) return;
+    _dayViewIdx = history.length - 1;
+  } else if (_dayViewIdx > 0) {
+    _dayViewIdx--;
+  } else {
+    return;
+  }
+  _animateDayContent('right');
+  renderDayView();
+}
+
+function navigateDayNext() {
+  if (_dayViewIdx === -1) return;
+  if (_dayViewIdx === history.length - 1) {
+    _dayViewIdx = -1;
+  } else {
+    _dayViewIdx++;
+  }
+  _animateDayContent('left');
+  renderDayView();
+}
+
+function renderDayView() {
+  const isToday = _dayViewIdx === -1;
+
+  // — Заголовок и стрелки —
+  const now = new Date();
+  const months = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+  const todayLabel = 'Сегодня, ' + now.getDate() + ' ' + months[now.getMonth()];
+  document.getElementById('ds-date-lbl').textContent = isToday
+    ? todayLabel
+    : fmtDateFull(history[_dayViewIdx].date);
+
+  const prevBtn = document.getElementById('ds-prev-btn');
+  const nextBtn = document.getElementById('ds-next-btn');
+  const hasPrev = isToday ? history.length > 0 : _dayViewIdx > 0;
+  const hasNext = !isToday;
+  prevBtn.classList.toggle('dim', !hasPrev);
+  nextBtn.classList.toggle('dim', !hasNext);
+
+  // — Источник данных —
+  let dayObj, dayFoods, dayActKcal, hasData;
+  if (isToday) {
+    const t = foods.reduce((a,f) => ({
+      kcal: a.kcal+f.kcal, prot: a.prot+f.prot, fat: a.fat+f.fat, carb: a.carb+f.carb
+    }), {kcal:0, prot:0, fat:0, carb:0});
+    dayFoods   = foods;
+    dayActKcal = actKcal;
+    dayObj = { kcal: Math.round(t.kcal), prot: Math.round(t.prot), fat: Math.round(t.fat), carb: Math.round(t.carb), actKcal, foods };
+    hasData = foods.length > 0;
+  } else {
+    const h = history[_dayViewIdx];
+    dayFoods   = h.foods || [];
+    dayActKcal = h.actKcal || 0;
+    dayObj = { kcal: h.kcal||0, prot: h.prot||0, fat: h.fat||0, carb: h.carb||0, actKcal: dayActKcal, foods: dayFoods };
+    hasData = true;
+  }
+
   const r = calcScores(dayObj);
   const [kcalPts, protPts, balPts, cleanPts, actPts] = r.scores;
 
-  // Summary
-  document.getElementById('ds-nutr-score').textContent = foods.length ? r.total    : '—';
-  document.getElementById('ds-day-score').textContent  = foods.length ? r.dayTotal : '—';
+  // Для исторического дня kgPerMonth считается динамически
+  const pace = isToday ? r.kgPerMonth : calcKgPerMonth(dayObj);
 
-  // kgPerMonth
-  const pace = r.kgPerMonth;
+  // — Итоговые баллы —
+  document.getElementById('ds-nutr-score').textContent = hasData ? r.total    : '—';
+  document.getElementById('ds-day-score').textContent  = hasData ? r.dayTotal : '—';
+
+  // — Темп —
   const paceEl = document.getElementById('ds-pace');
-  if (!foods.length) {
+  if (!hasData) {
     paceEl.innerHTML = '<span style="color:var(--muted)">Добавьте продукты для расчёта</span>';
   } else if (pace < 0) {
     paceEl.innerHTML = `<span style="color:var(--clean)">Похудение: ${Math.abs(pace).toFixed(1)} кг/мес</span>`;
@@ -1294,21 +1388,17 @@ function renderDayScore() {
     paceEl.innerHTML = `<span style="color:var(--muted)">Баланс</span>`;
   }
 
-  // Калории
-  document.getElementById('ds-kcal-info').textContent = foods.length
-    ? `Съедено: ${dayObj.kcal} ккал`
-    : 'Нет данных';
+  // — Калории —
+  document.getElementById('ds-kcal-info').textContent = hasData ? `Съедено: ${dayObj.kcal} ккал` : 'Нет данных';
   document.getElementById('ds-kcal-bar').style.width = `${Math.min(100, kcalPts / 40 * 100)}%`;
   document.getElementById('ds-kcal-pts').textContent = `${kcalPts} / 40`;
 
-  // Белок
-  document.getElementById('ds-prot-info').textContent = foods.length
-    ? `Белок: ${dayObj.prot} г`
-    : 'Нет данных';
+  // — Белок —
+  document.getElementById('ds-prot-info').textContent = hasData ? `Белок: ${dayObj.prot} г` : 'Нет данных';
   document.getElementById('ds-prot-bar').style.width = `${Math.min(100, protPts / 35 * 100)}%`;
   document.getElementById('ds-prot-pts').textContent = `${protPts} / 35`;
 
-  // Баланс БЖУ
+  // — Баланс БЖУ —
   const totalKcal = dayObj.prot*4 + dayObj.fat*9 + dayObj.carb*4;
   if (totalKcal > 0) {
     const bPct = Math.round(dayObj.prot*4 / totalKcal * 100);
@@ -1322,21 +1412,21 @@ function renderDayScore() {
   document.getElementById('ds-bal-bar').style.width = `${Math.min(100, balPts / 15 * 100)}%`;
   document.getElementById('ds-bal-pts').textContent = `${balPts} / 15`;
 
-  // Чистота
-  const snackKcal = foods
+  // — Чистота —
+  const snackKcal = dayFoods
     .filter(f => f.cleanliness === 'snack' || f.cleanliness === 'junk')
     .reduce((s,f) => s + (f.kcal||0), 0);
   const snackPct = dayObj.kcal > 0 ? Math.round(snackKcal / dayObj.kcal * 100) : 0;
-  document.getElementById('ds-clean-info').textContent = foods.length
+  document.getElementById('ds-clean-info').textContent = hasData
     ? (snackPct === 0 ? 'Только чистые продукты 🌿' : `Снеки/мусор: ${snackPct}% ккал`)
     : 'Нет данных';
   document.getElementById('ds-clean-bar').style.width = `${Math.min(100, cleanPts / 10 * 100)}%`;
   document.getElementById('ds-clean-pts').textContent = `${cleanPts} / 10`;
 
-  // Активность
-  document.getElementById('ds-act-info').textContent = actKcal > 0
-    ? `${actKcal} активных ккал`
-    : 'Укажите активность при закрытии дня';
+  // — Активность —
+  document.getElementById('ds-act-info').textContent = dayActKcal > 0
+    ? `${dayActKcal} активных ккал`
+    : (isToday ? 'Укажите активность при закрытии дня' : 'Активность не указана');
   document.getElementById('ds-act-bar').style.width = `${Math.min(100, actPts / 15 * 100)}%`;
   document.getElementById('ds-act-pts').textContent = `+${actPts} / 15`;
 }
