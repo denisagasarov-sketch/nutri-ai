@@ -570,7 +570,7 @@ input::placeholder{color:var(--muted)}
 // ═══════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════
-const VERSION = '1.1.5';
+const VERSION = '1.1.6';
 const G = { kcal:1800, prot:150, fat:60, carb:165 };
 
 const SYS_PROMPT = `Ты помощник по подсчёту КБЖУ. Отвечай ТОЛЬКО валидным JSON без markdown.
@@ -624,6 +624,37 @@ let _photoData      = null;
 // ═══════════════════════════════════════════
 //  BOOT
 // ═══════════════════════════════════════════
+function seedData() {
+  // 1. История 20.05 — добавить если ещё нет
+  const may20 = '2026-05-20T12:00:00.000Z';
+  const hasDay = history.some(h => h.date === may20);
+  if (!hasDay) {
+    history.push({
+      date: may20,
+      kcal: 1805, prot: 177, fat: 54, carb: 135,
+      actKcal: 0, garminDist: 0,
+      deficit: -5,
+      foods: [],
+      scores: [36, 35, 11, 10, 0],
+      total: 92,
+      dayTotal: 92,
+      kgPerMonth: 0
+    });
+    history.sort((a, b) => new Date(a.date) - new Date(b.date));
+    lsSave('history', history);
+  }
+
+  // 2. Продукты текущего дня 21.05
+  foods = [
+    { name:'Овсянка',              weight:50,  kcal:187, prot:6,    fat:3.5, carb:32,   cleanliness:'clean' },
+    { name:'Сгущёнка',             weight:20,  kcal:66,  prot:1.6,  fat:1.6, carb:11.2, cleanliness:'snack' },
+    { name:'Молоко Meiji',         weight:100, kcal:70,  prot:3,    fat:4,   carb:5,    cleanliness:'clean' },
+    { name:'Протеин Prostar Whey', weight:40,  kcal:160, prot:33.3, fat:1.3, carb:2.7,  cleanliness:'clean' },
+    { name:'Арахисовая паста',     weight:33,  kcal:176, prot:8.8,  fat:8.8, carb:13.2, cleanliness:'snack' }
+  ];
+  lsSave('foods', foods);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   // migrate: add date to old history entries without it
   let migrated = false;
@@ -634,6 +665,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
   if (migrated) lsSave('history', history);
+
+  if (!localStorage.getItem('seeded_21may')) {
+    seedData();
+    localStorage.setItem('seeded_21may', '1');
+    renderHistory();
+    renderFoods();
+  }
 
   const d = new Date();
   document.getElementById('hdrDate').textContent =
