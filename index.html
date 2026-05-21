@@ -593,7 +593,7 @@ input::placeholder{color:var(--muted)}
 // ═══════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════
-const VERSION = '1.2.5';
+const VERSION = '1.2.6';
 const G = { kcal:1800, prot:150, fat:60, carb:165 };
 
 const SYS_PROMPT = `Ты помощник по подсчёту КБЖУ. Отвечай ТОЛЬКО валидным JSON без markdown.
@@ -782,6 +782,51 @@ async function addFood() {
   const btn = document.getElementById('addBtn');
   const sta = document.getElementById('addStatus');
 
+  // Попытка разбить на несколько продуктов: «слово(а) + число + ед.»
+  const parts = txt.match(/[а-яёa-z][а-яёa-z\s]*\d+(?:[.,]\d+)?\s*(?:г|гр|мл|ml|g)?/gi);
+
+  if (parts && parts.length > 1) {
+    // ── MULTI-MODE ──
+    const key = localStorage.getItem('okey');
+    if (!key) { toast('Добавьте API ключ в Настройках'); return; }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spin"></span>';
+    let added = 0;
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i].trim();
+      sta.textContent = '⏳ ' + (i + 1) + '/' + parts.length + ' ' + part;
+
+      try {
+        const local = lookupUserFoods(part);
+        if (local) { pushFood(local); added++; continue; }
+
+        const data = await callGPT(part, key);
+        if (!data.error) {
+          if (!data.weight) {
+            const wm = part.match(/(\d+(?:[.,]\d+)?)\s*(?:г(?:р(?:амм?)?)?|мл|ml|g(?:r(?:am)?)?)(?=\s|$|[^а-яёa-z])/i);
+            data.weight = wm ? parseFloat(wm[1].replace(',', '.')) : 100;
+          }
+          data.name = data.name.replace(/\s+\d+(?:[.,]\d+)?\s*г$/i, '').trim();
+          pushFood(data);
+          added++;
+        }
+      } catch(e) {
+        sta.textContent = '❌ ' + part + ': ' + (e.message || 'Ошибка');
+        await new Promise(r => setTimeout(r, 1200));
+      }
+    }
+
+    inp.value = '';
+    sta.textContent = '✓ Добавлено: ' + added + '/' + parts.length;
+    setTimeout(() => { sta.textContent = ''; }, 2000);
+    btn.disabled = false; btn.textContent = '+';
+    return;
+  }
+
+  // ── SINGLE-MODE (логика без изменений) ──
+
   // 1) userFoods local lookup — no API needed
   const local = lookupUserFoods(txt);
   if (local) {
@@ -792,7 +837,7 @@ async function addFood() {
     return;
   }
 
-  // 2) GPT (SYS_PROMPT already encodes known products as fallback)
+  // 2) GPT
   const key = localStorage.getItem('okey');
   if (!key) { toast('Добавьте API ключ в Настройках'); return; }
 
