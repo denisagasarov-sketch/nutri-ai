@@ -202,6 +202,14 @@ input::placeholder{color:var(--muted)}
 /* ── Toast ── */
 .toast{position:fixed;bottom:85px;left:50%;transform:translateX(-50%) translateY(8px);background:#1e1e3a;border:1px solid var(--border);border-radius:10px;padding:11px 20px;font-size:14px;opacity:0;transition:all .25s;z-index:400;pointer-events:none;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.5)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+/* ── Stats card ── */
+.stats-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:10px}
+.stats-title{font-size:13px;font-weight:500;color:var(--muted);margin-bottom:12px}
+.stats-row{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:8px}
+.stats-item{text-align:center;min-width:0}
+.stats-value{font-size:22px;font-weight:600;word-break:break-all}
+.stats-label{font-size:11px;color:var(--muted);margin-top:2px}
+.stats-best{font-size:12px;color:var(--muted);text-align:center;margin-top:8px;padding-top:8px;border-top:.5px solid var(--border)}
 /* ── Help bottom sheet ── */
 #helpSheet{position:fixed;bottom:0;left:0;right:0;max-height:80vh;overflow-y:auto;background:var(--card);border-radius:16px 16px 0 0;padding:20px 16px;z-index:200;transform:translateY(100%);transition:transform .3s ease}
 #helpSheet h3{font-size:14px;color:#a78bfa;margin:16px 0 6px}
@@ -374,6 +382,7 @@ input::placeholder{color:var(--muted)}
 
   <!-- ═══ HISTORY ═══ -->
   <section class="sec" id="sec-history">
+    <div id="statsCard"></div>
     <div class="card">
       <div class="card-ttl">Динамика баллов и темп похудения</div>
       <div id="chartWrapper" style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
@@ -654,7 +663,7 @@ input::placeholder{color:var(--muted)}
 //  CONSTANTS
 // ═══════════════════════════════════════════
 const _dk = atob('c2stcHJvai1KY2VEU0hjLW0wSlR1WUVPckZ2WFN6bW14SUYydE1yS1BnUFdySHBsV1dWXzB6Nm1TQmF6Q0lPTUdUZkUzeTQ0aUpXQ2V6WVpwVFQzQmxia0ZKS3J4M3FnaUhlaE9FYW90cUFXRUV5d1pfZlhidjBNM0FYQTJrQ1VIU3RBTXNGQmZoTFlQaDVkbFlzSHNYNkRucE90WnRqLXRFZ0E=');
-const VERSION = '1.2.8';
+const VERSION = '1.2.9';
 const G = { kcal:1800, prot:150, fat:60, carb:165 };
 
 const SYS_PROMPT = `Ты помощник по подсчёту КБЖУ. Отвечай ТОЛЬКО валидным JSON без markdown.
@@ -1501,7 +1510,68 @@ function renderDayView() {
 // ═══════════════════════════════════════════
 //  HISTORY
 // ═══════════════════════════════════════════
-function renderHistory() { renderChart(); renderScoreTable(); renderNutriTable(); }
+function renderHistory() { renderStats(); renderChart(); renderScoreTable(); renderNutriTable(); }
+
+function calcTotalStats(hist) {
+  if (!hist || !hist.length) return null;
+  const targetKcal = G.kcal;
+  const goal = 'loss';
+
+  const totalDeficit = hist.reduce((sum, h) => {
+    const effKcal = (h.kcal||0) - (h.actKcal||0);
+    return sum + (targetKcal - effKcal);
+  }, 0);
+
+  const kgChanged = Math.round(-totalDeficit * 10 / 7700) / 10;
+  const kgColor = kgChanged <= 0 ? '#1D9E75' : '#E24B4A';
+
+  const avgScore    = Math.round(hist.reduce((s,h) => s + (h.total||0), 0) / hist.length);
+  const avgDayScore = Math.round(hist.reduce((s,h) => s + (h.dayTotal||h.total||0), 0) / hist.length);
+
+  const best = hist.reduce((b,h) =>
+    (h.dayTotal||h.total||0) > (b.dayTotal||b.total||0) ? h : b, hist[0]);
+
+  const daysOnTrack = hist.filter(h => {
+    const effKcal = (h.kcal||0) - (h.actKcal||0);
+    return targetKcal - effKcal > 0;
+  }).length;
+
+  return { kgChanged, kgColor, avgScore, avgDayScore, best, daysOnTrack, totalDays: hist.length, goal };
+}
+
+function renderStats() {
+  const el = document.getElementById('statsCard');
+  if (!el) return;
+  const s = calcTotalStats(history);
+  if (!s) { el.innerHTML = ''; return; }
+
+  const bestHtml = s.best
+    ? `<div class="stats-best">🏆 Лучший день: ${fmtDate(s.best.date)} — ${s.best.dayTotal||s.best.total} пт</div>`
+    : '';
+
+  el.innerHTML = `<div class="stats-card">
+    <div class="stats-title">📊 За всё время · ${s.totalDays} дней</div>
+    <div class="stats-row">
+      <div class="stats-item">
+        <div class="stats-value" style="color:${s.kgColor}">${s.kgChanged > 0 ? '+' : ''}${s.kgChanged} кг</div>
+        <div class="stats-label">потеряно</div>
+      </div>
+      <div class="stats-item">
+        <div class="stats-value">${s.avgScore}</div>
+        <div class="stats-label">средний балл питания</div>
+      </div>
+      <div class="stats-item">
+        <div class="stats-value">${s.avgDayScore}</div>
+        <div class="stats-label">средний балл дня</div>
+      </div>
+      <div class="stats-item">
+        <div class="stats-value">${s.daysOnTrack}/${s.totalDays}</div>
+        <div class="stats-label">дней в дефиците</div>
+      </div>
+    </div>
+    ${bestHtml}
+  </div>`;
+}
 
 function calcKgPerMonth(h) {
   const effKcal = (h.kcal || 0) - (h.actKcal || 0);
