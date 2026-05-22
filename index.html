@@ -209,6 +209,30 @@ input::placeholder{color:var(--muted)}
 .stats-value{font-size:22px;font-weight:600;word-break:break-all}
 .stats-label{font-size:11px;color:var(--muted);margin-top:2px}
 .stats-best{font-size:12px;color:var(--muted);text-align:center;margin-top:8px;padding-top:8px;border-top:.5px solid var(--border)}
+/* ── Profile card + edit sheet ── */
+.gender-tabs{display:flex;border-radius:10px;overflow:hidden;border:1.5px solid var(--border)}
+.gender-tab{flex:1;padding:9px;text-align:center;font-size:14px;font-weight:600;cursor:pointer;background:var(--bg);color:var(--muted);border:none;transition:background .2s,color .2s}
+.gender-tab.active{background:var(--grad);color:#fff}
+.pf-row{margin-bottom:14px}
+.pf-sublbl{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+.pf-2col{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.pf-select{width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;color:var(--text);padding:11px 13px;font-size:14px;-webkit-appearance:none;appearance:none;cursor:pointer}
+.pf-select:focus{outline:none;border-color:var(--kcal)}
+.tdee-info{font-size:12px;color:var(--muted);text-align:center;margin:6px 0 12px;min-height:18px}
+.targets-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+.tg-box{background:var(--bg);border-radius:8px;padding:8px 4px;text-align:center}
+.tg-box>.tg-lbl{display:block;font-size:10px;color:var(--muted);margin-bottom:4px}
+.tg-input{width:100%;background:transparent;border:none;border-bottom:1.5px solid var(--border);font-size:16px;font-weight:700;text-align:center;color:var(--text);padding:2px 0;-moz-appearance:textfield;box-sizing:border-box}
+.tg-input:focus{outline:none;border-bottom-color:var(--kcal)}
+.tg-input::-webkit-outer-spin-button,.tg-input::-webkit-inner-spin-button{-webkit-appearance:none}
+#profileCard{background:var(--bg);border-radius:var(--radius);padding:14px 16px;cursor:pointer;border:1px solid var(--border)}
+#profileCard:active{filter:brightness(0.92)}
+.profile-main{font-size:15px;font-weight:700;margin-bottom:4px}
+.profile-goal{font-size:13px;color:var(--muted);margin-bottom:3px}
+.profile-targets{font-size:13px;margin-bottom:4px}
+.profile-edit-hint{font-size:11px;color:var(--muted)}
+#profileEditSheet{position:fixed;bottom:0;left:0;right:0;max-height:88vh;overflow-y:auto;background:var(--card);border-radius:16px 16px 0 0;padding:20px 16px 40px;z-index:200;transform:translateY(100%);transition:transform .3s ease}
+.recalc-check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin:14px 0 4px;cursor:pointer}
 /* ── Help bottom sheet ── */
 #helpSheet{position:fixed;bottom:0;left:0;right:0;max-height:80vh;overflow-y:auto;background:var(--card);border-radius:16px 16px 0 0;padding:20px 16px;z-index:200;transform:translateY(100%);transition:transform .3s ease}
 #helpSheet h3{font-size:14px;color:#a78bfa;margin:16px 0 6px}
@@ -459,12 +483,7 @@ input::placeholder{color:var(--muted)}
 
     <div class="card">
       <div class="card-ttl">Профиль</div>
-      <div class="profile-grid">
-        <div class="pbox"><div class="pk">Возраст / вес</div><div class="pv">36 лет, 83 кг</div></div>
-        <div class="pbox"><div class="pk">Цель</div><div class="pv" style="color:var(--clean)">Похудение</div></div>
-        <div class="pbox"><div class="pk">Калории</div><div class="pv" style="color:var(--kcal)">1800 ккал</div></div>
-        <div class="pbox"><div class="pk">Б / Ж / У</div><div class="pv" style="font-size:13px">150 / 60 / 165 г</div></div>
-      </div>
+      <div id="profileCard"></div>
     </div>
 
     <div class="card">
@@ -496,6 +515,65 @@ input::placeholder{color:var(--muted)}
   </section>
 
 </div><!-- .app -->
+
+<!-- PROFILE EDIT BOTTOM SHEET -->
+<div class="help-overlay" id="profileEditOverlay" onclick="closeProfileEdit()"></div>
+<div id="profileEditSheet">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <span style="font-size:16px;font-weight:700">Редактировать профиль</span>
+    <button onclick="closeProfileEdit()" style="background:none;border:none;font-size:22px;color:var(--muted);cursor:pointer;padding:0;line-height:1">✕</button>
+  </div>
+  <div class="pf-row">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Пол</div>
+    <div class="gender-tabs">
+      <button class="gender-tab active" id="peGenderMale" onclick="setPeGender('male')">♂ Мужчина</button>
+      <button class="gender-tab" id="peGenderFemale" onclick="setPeGender('female')">♀ Женщина</button>
+    </div>
+  </div>
+  <div class="pf-2col">
+    <div><label class="pf-sublbl">Возраст</label><input type="number" id="pe-age" min="10" max="100" placeholder="лет" oninput="onPeChange()"></div>
+    <div><label class="pf-sublbl">Вес (кг)</label><input type="number" id="pe-weight" min="30" max="250" placeholder="кг" oninput="onPeChange()"></div>
+  </div>
+  <div class="pf-row">
+    <label class="pf-sublbl">Рост (см)</label>
+    <input type="number" id="pe-height" min="100" max="250" placeholder="см" style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;color:var(--text);padding:11px 13px;font-size:14px;box-sizing:border-box" oninput="onPeChange()">
+  </div>
+  <div class="pf-row">
+    <label class="pf-sublbl">Уровень активности</label>
+    <select class="pf-select" id="pe-act" onchange="onPeChange()">
+      <option value="1.2">Минимальный (&lt;3 000 шагов/день)</option>
+      <option value="1.375" selected>Низкий (3 000–7 000 шагов/день)</option>
+      <option value="1.55">Средний (7 000–12 000 шагов/день)</option>
+      <option value="1.725">Высокий (12 000+ шагов/день)</option>
+    </select>
+  </div>
+  <div class="pf-row">
+    <label class="pf-sublbl">Цель</label>
+    <select class="pf-select" id="pe-goal" onchange="onPeGoalChange()">
+      <option value="loss">Похудение</option>
+      <option value="maintain">Поддержание</option>
+      <option value="gain">Набор мышц</option>
+    </select>
+  </div>
+  <div class="pf-row" id="pe-mode-row">
+    <label class="pf-sublbl">Режим</label>
+    <select class="pf-select" id="pe-mode" onchange="onPeChange()">
+      <option value="mild">Мягкий</option>
+      <option value="moderate" selected>Умеренный</option>
+      <option value="intense">Интенсивный</option>
+    </select>
+  </div>
+  <div class="tdee-info" id="pe-tdee-info"></div>
+  <div class="targets-grid">
+    <div class="tg-box"><span class="tg-lbl" style="color:var(--kcal)">Ккал</span><input type="number" class="tg-input" id="pe-kcal" min="1000" max="5000"></div>
+    <div class="tg-box"><span class="tg-lbl" style="color:var(--prot)">Белок</span><input type="number" class="tg-input" id="pe-prot" min="50" max="400"></div>
+    <div class="tg-box"><span class="tg-lbl">Жиры</span><input type="number" class="tg-input" id="pe-fat" min="20" max="300"></div>
+    <div class="tg-box"><span class="tg-lbl" style="color:var(--balance)">Углев</span><input type="number" class="tg-input" id="pe-carb" min="0" max="600"></div>
+  </div>
+  <label class="recalc-check"><input type="checkbox" id="recalcHistory" checked> Пересчитать баллы за всю историю</label>
+  <button class="btn btn-full" style="margin-top:4px" onclick="saveProfileFromSheet()">Сохранить</button>
+  <button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="closeProfileEdit()">Отмена</button>
+</div>
 
 <!-- HELP BOTTOM SHEET -->
 <div class="help-overlay" id="helpOverlay" onclick="closeHelp()"></div>
@@ -666,8 +744,8 @@ input::placeholder{color:var(--muted)}
 //  CONSTANTS
 // ═══════════════════════════════════════════
 const _dk = atob('c2stcHJvai1KY2VEU0hjLW0wSlR1WUVPckZ2WFN6bW14SUYydE1yS1BnUFdySHBsV1dWXzB6Nm1TQmF6Q0lPTUdUZkUzeTQ0aUpXQ2V6WVpwVFQzQmxia0ZKS3J4M3FnaUhlaE9FYW90cUFXRUV5d1pfZlhidjBNM0FYQTJrQ1VIU3RBTXNGQmZoTFlQaDVkbFlzSHNYNkRucE90WnRqLXRFZ0E=');
-const VERSION = '1.3.3';
-const G = { kcal:1800, prot:150, fat:60, carb:165 };
+const VERSION = '1.3.4';
+let G = { kcal:1800, prot:150, fat:60, carb:165 };
 
 const SYS_PROMPT = `Ты помощник по подсчёту КБЖУ. Отвечай ТОЛЬКО валидным JSON без markdown.
 
@@ -750,6 +828,7 @@ function seedData() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  loadProfile();
   if (!localStorage.getItem('okey')) localStorage.setItem('okey', _dk);
   // migrate: add date to old history entries without it
   let migrated = false;
@@ -784,6 +863,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderKey();
   renderFoods();
   updateTotals();
+  renderProfileCard();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 });
 
@@ -797,7 +877,7 @@ function goTo(name) {
   document.getElementById('nav-' + name).classList.add('active');
   if (name === 'history')  renderHistory();
   if (name === 'day')      renderDayView();
-  if (name === 'settings') renderUserFoodsList();
+  if (name === 'settings') { renderUserFoodsList(); renderProfileCard(); }
 }
 
 // ═══════════════════════════════════════════
@@ -1733,6 +1813,148 @@ function drawAxisRight(area, h, kgPad, y2Ticks) {
   c.translate(w - 6, h / 2); c.rotate(Math.PI / 2);
   c.textAlign = 'center'; c.fillText('кг/мес', 0, 0);
   c.restore();
+}
+
+// ── Profile helpers ──
+function calcBMR(gender, weight, height, age) {
+  const base = 10 * weight + 6.25 * height - 5 * age;
+  return gender === 'male' ? base + 5 : base - 161;
+}
+function calcTargets(profile) {
+  const bmr  = calcBMR(profile.gender, profile.weight, profile.height, profile.age);
+  const tdee = Math.round(bmr * profile.actCoef);
+  const delta = {
+    loss:    { mild:-300, moderate:-500, intense:-700 },
+    gain:    { mild:+200, moderate:+400, intense:+600 },
+    maintain:{ mild:0,    moderate:0,    intense:0    }
+  };
+  const d    = (delta[profile.goal] || {})[profile.mode] ?? 0;
+  const kcal = Math.max(1200, tdee + d);
+  const prot = Math.round(({ loss:2.0, maintain:1.6, gain:2.0 }[profile.goal] || 1.8) * profile.weight);
+  const fat  = Math.round(kcal * 0.25 / 9);
+  const carb = Math.max(0, Math.round((kcal - prot * 4 - fat * 9) / 4));
+  return { kcal, prot, fat, carb, tdee };
+}
+const DEFAULT_PROFILE = {
+  gender:'male', age:null, weight:null, height:null,
+  actCoef:1.375, goal:'loss', mode:'moderate',
+  kcal:1800, prot:150, fat:60, carb:165, tdee:null
+};
+function loadProfile() {
+  const p = lsGet('profile', null);
+  if (!p) return;
+  const full = Object.assign({}, DEFAULT_PROFILE, p);
+  G = { kcal: full.kcal, prot: full.prot, fat: full.fat, carb: full.carb };
+}
+const GOAL_NAMES = { loss:'Похудение', maintain:'Поддержание', gain:'Набор мышц' };
+const MODE_NAMES = { mild:'Мягкий', moderate:'Умеренный', intense:'Интенсивный' };
+const ACT_NAMES  = { '1.2':'Мин.', '1.375':'Низкий', '1.55':'Средний', '1.725':'Высокий' };
+function renderProfileCard() {
+  const el = document.getElementById('profileCard');
+  if (!el) return;
+  const p = lsGet('profile', null);
+  if (!p || !p.age || !p.weight || !p.height) {
+    el.innerHTML = `<button class="btn btn-ghost btn-full" onclick="openProfileEdit()">Заполнить профиль</button>`;
+    el.onclick = null;
+    return;
+  }
+  const gIcon    = p.gender === 'female' ? '♀' : '♂';
+  const goalLine = [GOAL_NAMES[p.goal], p.goal !== 'maintain' ? MODE_NAMES[p.mode] : null, ACT_NAMES[String(p.actCoef)]].filter(Boolean).join(' · ');
+  el.innerHTML = `<div><div class="profile-main">${gIcon} ${p.age} лет · ${p.weight} кг · ${p.height} см</div><div class="profile-goal">${goalLine}</div><div class="profile-targets">${p.kcal} ккал · Б${p.prot}г · Ж${p.fat}г · У${p.carb}г</div><div class="profile-edit-hint">Нажми чтобы изменить ›</div></div>`;
+  el.onclick = openProfileEdit;
+}
+let _peGender = 'male';
+function setPeGender(g) {
+  _peGender = g;
+  document.getElementById('peGenderMale').classList.toggle('active', g === 'male');
+  document.getElementById('peGenderFemale').classList.toggle('active', g === 'female');
+  onPeChange();
+}
+function onPeGoalChange() {
+  const goal = document.getElementById('pe-goal').value;
+  const modeRow = document.getElementById('pe-mode-row');
+  if (modeRow) modeRow.style.display = goal === 'maintain' ? 'none' : '';
+  onPeChange();
+}
+function onPeChange() {
+  const age    = parseInt(document.getElementById('pe-age')?.value)    || 0;
+  const weight = parseInt(document.getElementById('pe-weight')?.value) || 0;
+  const height = parseInt(document.getElementById('pe-height')?.value) || 0;
+  const actCoef= parseFloat(document.getElementById('pe-act')?.value)  || 1.375;
+  const goal   = document.getElementById('pe-goal')?.value  || 'loss';
+  const mode   = document.getElementById('pe-mode')?.value  || 'moderate';
+  const tdeeEl = document.getElementById('pe-tdee-info');
+  if (!age || !weight || !height) { if (tdeeEl) tdeeEl.textContent = ''; return; }
+  const t = calcTargets({ gender: _peGender, age, weight, height, actCoef, goal, mode });
+  if (tdeeEl) tdeeEl.textContent = `TDEE: ~${t.tdee} ккал · Цель: ${t.kcal} ккал`;
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  set('pe-kcal', t.kcal); set('pe-prot', t.prot); set('pe-fat', t.fat); set('pe-carb', t.carb);
+}
+function openProfileEdit() {
+  const p = Object.assign({}, DEFAULT_PROFILE, lsGet('profile', {}));
+  _peGender = p.gender || 'male';
+  document.getElementById('peGenderMale').classList.toggle('active', _peGender === 'male');
+  document.getElementById('peGenderFemale').classList.toggle('active', _peGender === 'female');
+  const set = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
+  set('pe-age', p.age); set('pe-weight', p.weight); set('pe-height', p.height);
+  const actEl = document.getElementById('pe-act');
+  if (actEl) actEl.value = p.actCoef || 1.375;
+  const goalEl = document.getElementById('pe-goal');
+  if (goalEl) goalEl.value = p.goal || 'loss';
+  const modeRow = document.getElementById('pe-mode-row');
+  if (modeRow) modeRow.style.display = (p.goal === 'maintain') ? 'none' : '';
+  const modeEl = document.getElementById('pe-mode');
+  if (modeEl) modeEl.value = p.mode || 'moderate';
+  set('pe-kcal', p.kcal); set('pe-prot', p.prot); set('pe-fat', p.fat); set('pe-carb', p.carb);
+  const tdeeEl = document.getElementById('pe-tdee-info');
+  if (tdeeEl && p.tdee) tdeeEl.textContent = `TDEE: ~${p.tdee} ккал · Цель: ${p.kcal} ккал`;
+  document.getElementById('profileEditSheet').style.transform = 'translateY(0)';
+  document.getElementById('profileEditOverlay').classList.add('open');
+}
+function closeProfileEdit() {
+  document.getElementById('profileEditSheet').style.transform = 'translateY(100%)';
+  document.getElementById('profileEditOverlay').classList.remove('open');
+}
+function recalcAllHistory() {
+  const updated = history.map(h => {
+    const r = getScoresForDay(h);
+    return { ...h, scores: r.scores, total: r.total, dayTotal: r.dayTotal };
+  });
+  history = updated;
+  lsSave('history', updated);
+}
+function saveProfileFromSheet() {
+  const prevGoal = lsGet('profile', {}).goal;
+  const kcal = parseInt(document.getElementById('pe-kcal')?.value) || 1800;
+  const prot = parseInt(document.getElementById('pe-prot')?.value) || 150;
+  const fat  = parseInt(document.getElementById('pe-fat')?.value)  || 60;
+  const carb = parseInt(document.getElementById('pe-carb')?.value) || 165;
+  const age    = parseInt(document.getElementById('pe-age')?.value)    || null;
+  const weight = parseInt(document.getElementById('pe-weight')?.value) || null;
+  const height = parseInt(document.getElementById('pe-height')?.value) || null;
+  const actCoef= parseFloat(document.getElementById('pe-act')?.value)  || 1.375;
+  const goal   = document.getElementById('pe-goal')?.value  || 'loss';
+  const mode   = document.getElementById('pe-mode')?.value  || 'moderate';
+  let tdee = null;
+  if (age && weight && height) {
+    tdee = calcTargets({ gender: _peGender, age, weight, height, actCoef, goal, mode }).tdee;
+  }
+  const profile = { gender: _peGender, age, weight, height, actCoef, goal, mode, kcal, prot, fat, carb, tdee };
+  lsSave('profile', profile);
+  G = { kcal, prot, fat, carb };
+  const doRecalc = document.getElementById('recalcHistory')?.checked;
+  if (doRecalc) {
+    recalcAllHistory();
+    renderHistory();
+    toast('✅ Профиль обновлён · История пересчитана');
+  } else {
+    renderHistory();
+    toast('✅ Профиль обновлён');
+  }
+  updateTotals();
+  renderProfileCard();
+  closeProfileEdit();
+  if (prevGoal !== goal) setTimeout(() => openHelp(), 500);
 }
 
 function getScoresForDay(h) {
