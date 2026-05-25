@@ -800,6 +800,8 @@ let _dayEditIdx     = -1;
 let _dayEditFoodIdx = -1;
 let _dayViewIdx     = -1;
 let _swipeStartX    = 0;
+const _todayDate = new Date();
+_todayDate.setHours(0,0,0,0);
 
 // ═══════════════════════════════════════════
 //  BOOT
@@ -837,6 +839,7 @@ function seedData() {
 
 document.addEventListener('DOMContentLoaded', () => {
   loadProfile();
+  loadGoals();
   if (!localStorage.getItem('okey')) localStorage.setItem('okey', _dk);
   // migrate: add date to old history entries without it
   let migrated = false;
@@ -1434,7 +1437,7 @@ function closeDay() {
   const r = calcScores(dayObj);
 
   history.push({
-    date:       new Date().toISOString(),
+    date:       _todayDate.toISOString(),
     kcal:       dayObj.kcal,
     prot:       dayObj.prot,
     fat:        dayObj.fat,
@@ -1865,6 +1868,16 @@ function loadProfile() {
   const full = Object.assign({}, DEFAULT_PROFILE, p);
   G = { kcal: full.kcal, prot: full.prot, fat: full.fat, carb: full.carb };
 }
+function loadGoals() {
+  const profile = lsGet('profile', {});
+  const targets = profile.kcal
+    ? { kcal: profile.kcal, prot: profile.prot, fat: profile.fat, carb: profile.carb }
+    : calcTargets(profile);
+  G.kcal = targets.kcal || 1800;
+  G.prot = targets.prot || 150;
+  G.fat  = targets.fat  || 60;
+  G.carb = targets.carb || 165;
+}
 const GOAL_NAMES = { loss:'Похудение', maintain:'Поддержание', gain:'Набор мышц' };
 const MODE_NAMES = { mild:'Мягкий', moderate:'Умеренный', intense:'Интенсивный' };
 const ACT_NAMES  = { '1.2':'Мин.', '1.375':'Низкий', '1.55':'Средний', '1.725':'Высокий' };
@@ -1960,7 +1973,7 @@ function saveProfileFromSheet() {
   }
   const profile = { gender: _peGender, age, weight, height, actCoef, goal, mode, kcal, prot, fat, carb, tdee };
   lsSave('profile', profile);
-  G = { kcal, prot, fat, carb };
+  loadGoals();
   const doRecalc = document.getElementById('recalcHistory')?.checked;
   if (doRecalc) {
     recalcAllHistory();
