@@ -73,6 +73,8 @@ input::placeholder{color:var(--muted)}
 /* ── Icon button (camera etc.) ── */
 .btn-icon{background:var(--border);border:none;border-radius:10px;padding:10px 12px;font-size:18px;cursor:pointer;transition:background .15s,transform .1s;flex-shrink:0;-webkit-appearance:none;line-height:1;color:var(--text)}
 .btn-icon:active{transform:scale(.93);background:#3a3a5a}
+.bw-q{flex:1;background:var(--bg);border:1.5px solid var(--border);border-radius:12px;padding:10px 0;font-size:24px;cursor:pointer;transition:background .15s,transform .1s,border-color .15s;-webkit-appearance:none;line-height:1}
+.bw-q:active{transform:scale(.9);background:#26264a;border-color:var(--clean)}
 .btn-icon:disabled{opacity:.45;pointer-events:none}
 
 /* ── Macro summary ── */
@@ -293,6 +295,27 @@ input::placeholder{color:var(--muted)}
       </div>
     </div>
 
+    <!-- Стул -->
+    <div class="card">
+      <div class="card-ttl" style="margin-bottom:10px">💩 Стул сегодня</div>
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px">
+        <div style="text-align:center;min-width:64px">
+          <div id="bw-count" style="font-size:30px;font-weight:800;line-height:1;color:var(--clean)">0</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:3px">раз за день</div>
+        </div>
+        <div id="bw-log" style="flex:1;font-size:22px;letter-spacing:2px;min-height:26px;word-break:break-all">—</div>
+        <button class="btn-icon" id="bw-undo" onclick="undoBowel()" title="Отменить последнее" style="opacity:.6">↶</button>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="bw-q" onclick="logBowel(1)" title="Запор (твёрдый, камешки)">🪨</button>
+        <button class="bw-q" onclick="logBowel(2)" title="Плотный (комковатый)">🌰</button>
+        <button class="bw-q" onclick="logBowel(3)" title="Идеал (мягкая колбаска)">💩</button>
+        <button class="bw-q" onclick="logBowel(4)" title="Мягкий (кашица)">🥣</button>
+        <button class="bw-q" onclick="logBowel(5)" title="Понос (жидкий)">🌊</button>
+      </div>
+      <div id="bw-assess" style="font-size:13px;text-align:center;padding:10px 2px 2px;line-height:1.35">Отметь, когда сходишь — оценю ЖКТ</div>
+    </div>
+
     <!-- Список еды -->
     <div class="card">
       <div class="sec-hdr">
@@ -398,6 +421,17 @@ input::placeholder{color:var(--muted)}
         <div class="sc-footer">
           <span style="font-size:11px;color:var(--muted)">цель ≥350 акт. ккал</span>
           <span class="sc-pts" style="color:var(--activity)" id="ds-act-pts">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bowel -->
+    <div class="card">
+      <div class="sc-comp">
+        <div class="sc-hdr"><span class="sc-name">💩 Стул</span><span class="sc-max" id="ds-bw-count">—</span></div>
+        <div class="sc-info" id="ds-bw-log" style="font-size:20px;letter-spacing:2px;min-height:22px">—</div>
+        <div class="sc-footer">
+          <span style="font-size:12px;line-height:1.35" id="ds-bw-assess">—</span>
         </div>
       </div>
     </div>
@@ -756,7 +790,7 @@ input::placeholder{color:var(--muted)}
 //  CONSTANTS
 // ═══════════════════════════════════════════
 const _dk = atob('c2stcHJvai1KY2VEU0hjLW0wSlR1WUVPckZ2WFN6bW14SUYydE1yS1BnUFdySHBsV1dWXzB6Nm1TQmF6Q0lPTUdUZkUzeTQ0aUpXQ2V6WVpwVFQzQmxia0ZKS3J4M3FnaUhlaE9FYW90cUFXRUV5d1pfZlhidjBNM0FYQTJrQ1VIU3RBTXNGQmZoTFlQaDVkbFlzSHNYNkRucE90WnRqLXRFZ0E=');
-const VERSION = '1.3.42';
+const VERSION = '1.4.0';
 let G = { kcal:1800, prot:150, fat:60, carb:165 };
 
 const SYS_PROMPT = `Ты помощник по подсчёту КБЖУ. Отвечай ТОЛЬКО валидным JSON без markdown.
@@ -795,6 +829,7 @@ const PRESET = [
 ];
 
 let foods      = lsGet('foods',   []);
+let bowel      = lsGet('bowel',   { count: 0, log: [] });
 let history    = lsGet('history', null) ?? [...PRESET];
 let actKcal = parseInt(localStorage.getItem('actKcal') || '0');
 let chart      = null;
@@ -880,6 +915,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   renderKey();
   renderFoods();
+  renderBowel();
   updateTotals();
   renderProfileCard();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
@@ -1338,6 +1374,54 @@ function saveActivity() {
   localStorage.setItem('actKcal', actKcal);
 }
 
+// ═══════════════════════════════════════════
+//  BOWEL TRACKER (стул)
+// ═══════════════════════════════════════════
+const BW_EMOJI = { 1:'🪨', 2:'🌰', 3:'💩', 4:'🥣', 5:'🌊' };
+
+function logBowel(q) {
+  bowel.log.push(q);
+  bowel.count = bowel.log.length;
+  lsSave('bowel', bowel);
+  renderBowel();
+}
+
+function undoBowel() {
+  if (!bowel.log.length) { toast('Нечего отменять'); return; }
+  bowel.log.pop();
+  bowel.count = bowel.log.length;
+  lsSave('bowel', bowel);
+  renderBowel();
+}
+
+function bowelAssessment(log) {
+  if (!log || !log.length) {
+    return { text: 'Сегодня не ходил 💤 — пей воду, добавь клетчатки и движения', color: 'var(--muted)' };
+  }
+  const avg = log.reduce((a, b) => a + b, 0) / log.length;
+  const n = log.length;
+  let text, color;
+  if (avg <= 1.5)      { text = 'Запор 😣 — больше воды, клетчатки и движения';      color = 'var(--kcal)'; }
+  else if (avg < 2.5)  { text = 'Плотновато — норм, но добавь овощей и воды';          color = 'var(--prot)'; }
+  else if (avg <= 3.5) { text = 'Идеально ✅ кишечник в порядке';                       color = 'var(--clean)'; }
+  else if (avg < 4.5)  { text = 'Мягко — в целом ок, следи за рационом';               color = 'var(--prot)'; }
+  else                 { text = 'Жидко 💧 — возможно несварение, следи за водой/едой'; color = 'var(--balance)'; }
+  if (n >= 4)          { text += ' · многовато раз (' + n + ')'; }
+  return { text, color };
+}
+
+function renderBowel() {
+  const cnt = document.getElementById('bw-count');
+  const logEl = document.getElementById('bw-log');
+  const assessEl = document.getElementById('bw-assess');
+  if (!cnt) return;
+  cnt.textContent = bowel.log.length;
+  logEl.textContent = bowel.log.length ? bowel.log.map(q => BW_EMOJI[q] || '').join(' ') : '—';
+  const a = bowelAssessment(bowel.log);
+  assessEl.textContent = a.text;
+  assessEl.style.color = a.color;
+}
+
 function openCloseDayModal() {
   if (!foods.length) { toast('Нет данных за день'); return; }
   document.getElementById('closeDayModal').style.display = 'flex';
@@ -1463,15 +1547,18 @@ function closeDay() {
     dayTotal:   r.dayTotal,
     kgPerMonth: r.kgPerMonth,
     foods:      [...foods],
-    actKcal:    actKcal
+    actKcal:    actKcal,
+    bowel:      { count: bowel.log.length, log: [...bowel.log] }
   });
   lsSave('history', history);
 
   foods=[];actKcal=0;
+  bowel={ count:0, log:[] };
   lsSave('foods',foods);
+  lsSave('bowel',bowel);
   localStorage.setItem('actKcal','0');
   document.getElementById('actKcal').value='';
-  renderFoods(); updateTotals();
+  renderFoods(); renderBowel(); updateTotals();
   toast(`День закрыт! Питание: ${r.total}/100, День: ${r.dayTotal}/115`);
 }
 
@@ -1614,6 +1701,16 @@ function renderDayView() {
     : (isToday ? 'Укажите активность при закрытии дня' : 'Активность не указана');
   document.getElementById('ds-act-bar').style.width = `${Math.min(100, actPts / 15 * 100)}%`;
   document.getElementById('ds-act-pts').textContent = `+${actPts} / 15`;
+
+  // — Стул —
+  const dayBowel = isToday ? bowel : (history[_dayViewIdx].bowel || { log: [] });
+  const bwLog = dayBowel.log || [];
+  document.getElementById('ds-bw-count').textContent = bwLog.length + ' раз';
+  document.getElementById('ds-bw-log').textContent   = bwLog.length ? bwLog.map(q => BW_EMOJI[q] || '').join(' ') : '—';
+  const bwa = bowelAssessment(bwLog);
+  const bwAssessEl = document.getElementById('ds-bw-assess');
+  bwAssessEl.textContent = bwa.text;
+  bwAssessEl.style.color = bwa.color;
 }
 
 // ═══════════════════════════════════════════
