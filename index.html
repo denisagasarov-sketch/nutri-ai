@@ -75,6 +75,8 @@ input::placeholder{color:var(--muted)}
 .btn-icon:active{transform:scale(.93);background:#3a3a5a}
 .bw-q{flex:1;background:var(--bg);border:1.5px solid var(--border);border-radius:12px;padding:10px 0;font-size:24px;cursor:pointer;transition:background .15s,transform .1s,border-color .15s;-webkit-appearance:none;line-height:1}
 .bw-q:active{transform:scale(.9);background:#26264a;border-color:var(--clean)}
+.wt-q{flex:1;background:var(--bg);border:1.5px solid var(--border);border-radius:12px;padding:11px 0;font-size:15px;font-weight:700;color:var(--text);cursor:pointer;transition:background .15s,transform .1s,border-color .15s;-webkit-appearance:none;line-height:1}
+.wt-q:active{transform:scale(.9);background:#26264a;border-color:var(--balance)}
 .btn-icon:disabled{opacity:.45;pointer-events:none}
 
 /* ── Macro summary ── */
@@ -295,6 +297,23 @@ input::placeholder{color:var(--muted)}
       </div>
     </div>
 
+    <!-- Вода -->
+    <div class="card">
+      <div class="card-ttl" style="margin-bottom:10px">💧 Вода сегодня</div>
+      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px">
+        <span id="wt-ml" style="font-size:26px;font-weight:800;line-height:1;color:var(--balance)">0</span>
+        <span id="wt-goal" style="font-size:13px;color:var(--muted)">/ 2500 мл</span>
+        <button class="btn-icon" id="wt-undo" onclick="undoWater()" title="Отменить последнее" style="margin-left:auto;opacity:.6">↶</button>
+      </div>
+      <div class="track" style="height:8px;margin-bottom:12px"><div class="fill" id="wt-bar" style="width:0%;background:var(--balance)"></div></div>
+      <div style="display:flex;gap:6px">
+        <button class="wt-q" onclick="addWater(100)">+100</button>
+        <button class="wt-q" onclick="addWater(250)">стакан · 250</button>
+        <button class="wt-q" onclick="addWater(500)">бутылка · 500</button>
+      </div>
+      <div id="wt-status" style="font-size:13px;text-align:center;padding:10px 2px 2px">Пей воду — остальные напитки учитываются в трекере еды</div>
+    </div>
+
     <!-- Стул -->
     <div class="card">
       <div class="card-ttl" style="margin-bottom:10px">💩 Стул сегодня</div>
@@ -421,6 +440,18 @@ input::placeholder{color:var(--muted)}
         <div class="sc-footer">
           <span style="font-size:11px;color:var(--muted)">цель ≥350 акт. ккал</span>
           <span class="sc-pts" style="color:var(--activity)" id="ds-act-pts">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Water -->
+    <div class="card">
+      <div class="sc-comp">
+        <div class="sc-hdr"><span class="sc-name">💧 Вода</span><span class="sc-max" id="ds-wt-goal">—</span></div>
+        <div class="sc-info" id="ds-wt-info">—</div>
+        <div class="track" style="height:8px"><div class="fill" id="ds-wt-bar" style="width:0%;background:var(--balance)"></div></div>
+        <div class="sc-footer">
+          <span style="font-size:12px" id="ds-wt-status">—</span>
         </div>
       </div>
     </div>
@@ -790,7 +821,7 @@ input::placeholder{color:var(--muted)}
 //  CONSTANTS
 // ═══════════════════════════════════════════
 const _dk = atob('c2stcHJvai1KY2VEU0hjLW0wSlR1WUVPckZ2WFN6bW14SUYydE1yS1BnUFdySHBsV1dWXzB6Nm1TQmF6Q0lPTUdUZkUzeTQ0aUpXQ2V6WVpwVFQzQmxia0ZKS3J4M3FnaUhlaE9FYW90cUFXRUV5d1pfZlhidjBNM0FYQTJrQ1VIU3RBTXNGQmZoTFlQaDVkbFlzSHNYNkRucE90WnRqLXRFZ0E=');
-const VERSION = '1.4.0';
+const VERSION = '1.5.0';
 let G = { kcal:1800, prot:150, fat:60, carb:165 };
 
 const SYS_PROMPT = `Ты помощник по подсчёту КБЖУ. Отвечай ТОЛЬКО валидным JSON без markdown.
@@ -830,6 +861,7 @@ const PRESET = [
 
 let foods      = lsGet('foods',   []);
 let bowel      = lsGet('bowel',   { count: 0, log: [] });
+let water      = lsGet('water',   { ml: 0, log: [] });
 let history    = lsGet('history', null) ?? [...PRESET];
 let actKcal = parseInt(localStorage.getItem('actKcal') || '0');
 let chart      = null;
@@ -916,6 +948,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderKey();
   renderFoods();
   renderBowel();
+  renderWater();
   updateTotals();
   renderProfileCard();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
@@ -1375,6 +1408,51 @@ function saveActivity() {
 }
 
 // ═══════════════════════════════════════════
+//  WATER TRACKER (вода)
+// ═══════════════════════════════════════════
+function waterGoal(actKcalVal) {
+  const p = lsGet('profile', {});
+  const base = p && p.weight ? Math.round(p.weight * 30 / 50) * 50 : 2500;
+  const bonus = (actKcalVal || 0) > 0 ? 500 : 0;
+  return base + bonus;
+}
+
+function addWater(ml) {
+  water.log.push(ml);
+  water.ml = water.log.reduce((a, b) => a + b, 0);
+  lsSave('water', water);
+  renderWater();
+}
+
+function undoWater() {
+  if (!water.log.length) { toast('Нечего отменять'); return; }
+  water.log.pop();
+  water.ml = water.log.reduce((a, b) => a + b, 0);
+  lsSave('water', water);
+  renderWater();
+}
+
+function waterStatus(ml, goal) {
+  const pct = goal > 0 ? ml / goal : 0;
+  if (pct >= 1)   return { text: 'Цель достигнута ✅', color: 'var(--clean)' };
+  if (pct >= 0.6) return { text: 'Норма 🟡 — добей до цели', color: 'var(--prot)' };
+  return { text: 'Мало 🔴 — пей больше воды', color: 'var(--kcal)' };
+}
+
+function renderWater() {
+  const mlEl = document.getElementById('wt-ml');
+  if (!mlEl) return;
+  const goal = waterGoal(actKcal);
+  mlEl.textContent = water.ml;
+  document.getElementById('wt-goal').textContent = '/ ' + goal + ' мл';
+  document.getElementById('wt-bar').style.width = Math.min(100, goal > 0 ? water.ml / goal * 100 : 0) + '%';
+  const s = waterStatus(water.ml, goal);
+  const st = document.getElementById('wt-status');
+  st.textContent = s.text;
+  st.style.color = s.color;
+}
+
+// ═══════════════════════════════════════════
 //  BOWEL TRACKER (стул)
 // ═══════════════════════════════════════════
 const BW_EMOJI = { 1:'🪨', 2:'🌰', 3:'💩', 4:'🥣', 5:'🌊' };
@@ -1548,17 +1626,20 @@ function closeDay() {
     kgPerMonth: r.kgPerMonth,
     foods:      [...foods],
     actKcal:    actKcal,
-    bowel:      { count: bowel.log.length, log: [...bowel.log] }
+    bowel:      { count: bowel.log.length, log: [...bowel.log] },
+    water:      { ml: water.ml, goal: waterGoal(actKcal) }
   });
   lsSave('history', history);
 
   foods=[];actKcal=0;
   bowel={ count:0, log:[] };
+  water={ ml:0, log:[] };
   lsSave('foods',foods);
   lsSave('bowel',bowel);
+  lsSave('water',water);
   localStorage.setItem('actKcal','0');
   document.getElementById('actKcal').value='';
-  renderFoods(); renderBowel(); updateTotals();
+  renderFoods(); renderBowel(); renderWater(); updateTotals();
   toast(`День закрыт! Питание: ${r.total}/100, День: ${r.dayTotal}/115`);
 }
 
@@ -1701,6 +1782,18 @@ function renderDayView() {
     : (isToday ? 'Укажите активность при закрытии дня' : 'Активность не указана');
   document.getElementById('ds-act-bar').style.width = `${Math.min(100, actPts / 15 * 100)}%`;
   document.getElementById('ds-act-pts').textContent = `+${actPts} / 15`;
+
+  // — Вода —
+  const dayWater = isToday ? { ml: water.ml, goal: waterGoal(actKcal) }
+                           : (history[_dayViewIdx].water || { ml: 0, goal: 0 });
+  const wGoal = dayWater.goal || waterGoal(dayActKcal);
+  document.getElementById('ds-wt-goal').textContent = 'цель ' + wGoal + ' мл';
+  document.getElementById('ds-wt-info').textContent = (dayWater.ml || 0) + ' мл выпито';
+  document.getElementById('ds-wt-bar').style.width = Math.min(100, wGoal > 0 ? (dayWater.ml || 0) / wGoal * 100 : 0) + '%';
+  const ws = waterStatus(dayWater.ml || 0, wGoal);
+  const wsEl = document.getElementById('ds-wt-status');
+  wsEl.textContent = ws.text;
+  wsEl.style.color = ws.color;
 
   // — Стул —
   const dayBowel = isToday ? bowel : (history[_dayViewIdx].bowel || { log: [] });
