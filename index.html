@@ -77,6 +77,12 @@ input::placeholder{color:var(--muted)}
 .bw-q:active{transform:scale(.9);background:#26264a;border-color:var(--clean)}
 .wt-q{flex:1;background:var(--bg);border:1.5px solid var(--border);border-radius:12px;padding:11px 0;font-size:15px;font-weight:700;color:var(--text);cursor:pointer;transition:background .15s,transform .1s,border-color .15s;-webkit-appearance:none;line-height:1}
 .wt-q:active{transform:scale(.9);background:#26264a;border-color:var(--balance)}
+.sug-box{margin-top:8px;display:none;flex-direction:column;gap:4px}
+.sug-box.show{display:flex}
+.sug-item{display:flex;align-items:center;gap:8px;padding:9px 10px;background:var(--bg);border:1px solid var(--border);border-radius:10px;cursor:pointer;text-align:left;-webkit-appearance:none;transition:background .12s}
+.sug-item:active{background:#26264a}
+.sug-nm{flex:1;font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sug-bd{font-size:10px;color:var(--muted);flex-shrink:0}
 .btn-icon:disabled{opacity:.45;pointer-events:none}
 
 /* ── Macro summary ── */
@@ -266,6 +272,7 @@ input::placeholder{color:var(--muted)}
         <input type="text" id="foodInput" placeholder="курица 150г, овсянка 70г…" autocomplete="off" />
         <button class="btn" id="addBtn" onclick="addFood()">+</button>
       </div>
+      <div class="sug-box" id="foodSug"></div>
       <div class="status-txt" id="addStatus"></div>
     </div>
 
@@ -821,7 +828,7 @@ input::placeholder{color:var(--muted)}
 //  CONSTANTS
 // ═══════════════════════════════════════════
 const _dk = atob('c2stcHJvai1KY2VEU0hjLW0wSlR1WUVPckZ2WFN6bW14SUYydE1yS1BnUFdySHBsV1dWXzB6Nm1TQmF6Q0lPTUdUZkUzeTQ0aUpXQ2V6WVpwVFQzQmxia0ZKS3J4M3FnaUhlaE9FYW90cUFXRUV5d1pfZlhidjBNM0FYQTJrQ1VIU3RBTXNGQmZoTFlQaDVkbFlzSHNYNkRucE90WnRqLXRFZ0E=');
-const VERSION = '1.5.0';
+const VERSION = '1.6.0';
 let G = { kcal:1800, prot:150, fat:60, carb:165 };
 
 const SYS_PROMPT = `Ты помощник по подсчёту КБЖУ. Отвечай ТОЛЬКО валидным JSON без markdown.
@@ -936,7 +943,11 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('hdrDate').textContent =
     d.toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'}) + ' · v' + VERSION;
   if (actKcal) document.getElementById('actKcal').value = actKcal;
-  document.getElementById('foodInput').addEventListener('keydown', e => { if (e.key==='Enter') addFood(); });
+  const _fi = document.getElementById('foodInput');
+  _fi.addEventListener('keydown', e => { if (e.key==='Enter') addFood(); });
+  _fi.addEventListener('input', renderFoodSuggestions);
+  _fi.addEventListener('focus', renderFoodSuggestions);
+  _fi.addEventListener('blur', () => setTimeout(hideFoodSug, 200));
   const daySection = document.getElementById('sec-day');
   daySection.addEventListener('touchstart', e => { _swipeStartX = e.touches[0].clientX; }, { passive: true });
   daySection.addEventListener('touchend', e => {
@@ -1010,6 +1021,84 @@ function restoreDefaultKey() {
 // ═══════════════════════════════════════════
 //  ADD FOOD (text)
 // ═══════════════════════════════════════════
+// ═══════════════════════════════════════════
+//  FOOD SUGGESTIONS (автокомплит)
+// ═══════════════════════════════════════════
+function buildFoodSuggestionPool() {
+  const mine = lsGet('userFoods', []).map(p => ({
+    name: p.name, aliases: p.aliases || [], src: 'mine', count: 1e9
+  }));
+  const seen = new Set(mine.map(m => m.name.toLowerCase()));
+  const freqMap = new Map();
+  const collect = arr => (arr || []).forEach(f => {
+    if (!f || !f.name) return;
+    const key = f.name.trim().toLowerCase();
+    if (!key) return;
+    const cur = freqMap.get(key) || { name: f.name.trim(), aliases: [], src: 'freq', count: 0 };
+    cur.count++;
+    freqMap.set(key, cur);
+  });
+  history.forEach(h => collect(h.foods));
+  collect(foods);
+  const freq = [...freqMap.values()].filter(f => !seen.has(f.name.toLowerCase()));
+  return mine.concat(freq);
+}
+
+function hideFoodSug() {
+  const b = document.getElementById('foodSug');
+  if (b) { b.classList.remove('show'); b.innerHTML = ''; }
+}
+
+function pickSuggestion(name) {
+  const inp = document.getElementById('foodInput');
+  inp.value = name + ' ';
+  hideFoodSug();
+  inp.focus();
+  inp.setSelectionRange(inp.value.length, inp.value.length);
+}
+
+function renderFoodSuggestions() {
+  const inp = document.getElementById('foodInput');
+  const box = document.getElementById('foodSug');
+  if (!inp || !box) return;
+  // для поиска берём только буквенную часть (без граммовки)
+  const q = inp.value.toLowerCase().replace(/[\d,.].*$/, '').trim();
+  const pool = buildFoodSuggestionPool();
+  let list;
+  if (!q) {
+    list = pool.slice().sort((a, b) => b.count - a.count).slice(0, 6);
+  } else {
+    list = pool.filter(p =>
+      p.name.toLowerCase().includes(q) ||
+      (p.aliases || []).some(a => a.toLowerCase().includes(q))
+    ).sort((a, b) => {
+      const aS = a.name.toLowerCase().startsWith(q) ? 0 : 1;
+      const bS = b.name.toLowerCase().startsWith(q) ? 0 : 1;
+      if (aS !== bS) return aS - bS;
+      return b.count - a.count;
+    }).slice(0, 6);
+  }
+  if (!list.length) { hideFoodSug(); return; }
+  box.innerHTML = '';
+  list.forEach(p => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sug-item';
+    btn.addEventListener('mousedown', e => e.preventDefault());
+    btn.addEventListener('click', () => pickSuggestion(p.name));
+    const nm = document.createElement('span');
+    nm.className = 'sug-nm';
+    nm.textContent = p.name;
+    const bd = document.createElement('span');
+    bd.className = 'sug-bd';
+    bd.textContent = p.src === 'mine' ? '📦 моё' : '🕑 часто';
+    btn.appendChild(nm);
+    btn.appendChild(bd);
+    box.appendChild(btn);
+  });
+  box.classList.add('show');
+}
+
 function lookupUserFoods(txt) {
   const userFoods = lsGet('userFoods', []);
   if (!userFoods.length) return null;
@@ -1077,7 +1166,7 @@ async function addFood() {
       }
     }
 
-    inp.value = '';
+    inp.value = ''; hideFoodSug();
     sta.textContent = '✓ Добавлено: ' + added + '/' + parts.length;
     setTimeout(() => { sta.textContent = ''; }, 2000);
     btn.disabled = false; btn.textContent = '+';
@@ -1090,7 +1179,7 @@ async function addFood() {
   const local = lookupUserFoods(txt);
   if (local) {
     pushFood(local);
-    inp.value = '';
+    inp.value = ''; hideFoodSug();
     sta.textContent = '📦 ' + local.name;
     setTimeout(() => { sta.textContent = ''; }, 2000);
     return;
@@ -1117,7 +1206,7 @@ async function addFood() {
       }
       data.name = data.name.replace(/\s+\d+(?:[.,]\d+)?\s*г$/i, '').trim();
       pushFood(data);
-      inp.value = '';
+      inp.value = ''; hideFoodSug();
       sta.textContent = '🤖 ' + data.name;
       setTimeout(() => { sta.textContent = ''; }, 2000);
     }
